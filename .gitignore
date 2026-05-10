@@ -1,0 +1,50 @@
+# --- Node.js (gRPC Service & k6) ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+.pnp*
+.cache/
+
+# --- Python (FastAPI Services) ---
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# --- Docker ---
+.docker/
+# Ako ne želiš da šalješ podatke iz baza na Git:
+postgres_data/
+mongodb_data/
+cassandra_data/
+redis_data/
+
+# --- Databases & OS ---
+*.db
+*.sqlite3
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- IDEs & Tools ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Load Testing (k6) ---
+summary.json
+*.log
+
+postgres_data/
+__pycache__/
+node_modules/
+venv/

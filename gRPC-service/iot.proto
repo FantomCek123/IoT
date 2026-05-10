@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package iot;
+
+message MeasurementRequest {
+  string device_id = 1;
+  float temperature = 2;
+  float humidity = 3;
+  float co2 = 4;
+  float voltage = 5;
+  float light_intensity = 6;
+  string timestamp = 7;
+}
+
+message MeasurementResponse {
+  string status = 1;
+  string message = 2;
+}
+
+service IoTService {
+  rpc SendMeasurement (MeasurementRequest) returns (MeasurementResponse);
+}

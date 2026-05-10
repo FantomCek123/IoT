@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:15
+    container_name: iot_postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: Vukasin
+      POSTGRES_PASSWORD: 18972
+      POSTGRES_DB: iot_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+
+  rest-service:
+    build: ./rest-service
+    container_name: fastapi_rest_service
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://Vukasin:18972@db:5432/iot_db
+
+  grpc-service:
+    build: ./grpc-service
+    container_name: node_grpc_service
+    restart: always
+    ports:
+      - "50051:50051"
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://Vukasin:18972@db:5432/iot_db
+    
+  graphql-service:
+    build: ./graphql-service
+    container_name: fastapi_graphql_service
+    ports:
+      - "8002:8000"
+    environment:
+      - DATABASE_URL=postgresql://Vukasin:18972@db:5432/iot_db
+    depends_on:
+      - db
