@@ -1,0 +1,17 @@
+{
+  "name": "ingestion-service",
+  "version": "1.0.0",
+  "description": "IoT Data Ingestion Simulator",
+  "main": "simulator.js",
+  "scripts": {
+    "start": "node simulator.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "kafkajs": "^2.2.4",
+    "mqtt": "^5.15.1"
+  }
+}
