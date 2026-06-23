@@ -12,23 +12,21 @@ GraphQL Service
 Tehnologija: Python (FastAPI/Strawberry)
 Endpoint: http://localhost:8002/graphql
 
-
 ANALIZA I EVALUACIJA PERFORMANSI
 
 A. Load Testing rezultati (k6 test)
-gRPC: grpc_req_duration = 5ms, p(95) =  14.37ms
-HTTP: grpc_req_duration = 851.97ms, p(95) = 3.73s
-Protok: Sistem je uspešno procesirao oko 189 HTTP zahteva u sekundi.
+gRPC: grpc_req_duration = 4.63ms, p(95) = 11.45ms
+HTTP: http_req_duration = 546.69ms, p(95) = 228.09ms
+Protok: Sistem je uspešno procesirao oko 41.27 HTTP zahteva u sekundi.
 
 B. Analiza mrežnog saobraćaja (Payload Size)
 REST (JSON): Ukupna veličina 639 B (zahtev 485 B + odgovor 154 B).
 GraphQL (JSON): Ukupna veličina 422 B (zahtev 310 B + odgovor 112 B).
 gRPC (Protobuf): Ukupna veličina 100 B (zahtev 76 B + odgovor 24 B).
 
-
 C. Iskorišćenost sistemskih resursa (Docker stats)
 
-fastapi_graphql_service: CPU 95.71%, RAM 70.28 MiB.
-fastapi_rest_service: CPU 89.50%, RAM 62.02 MiB.
-node_grpc_service: CPU 27.60%, RAM 71.37 MiB.
-iot_postgres_db: CPU 26.55%, RAM 44.2MiB.
+fastapi_graphql_service: CPU 0.14%, RAM 63.35 MiB.
+fastapi_rest_service: CPU 1.90%, RAM 79.07 MiB.
+node_grpc_service: CPU 2.97%, RAM 30.36 MiB.
+iot_postgres_db: CPU 0.67%, RAM 97.46 MiB.

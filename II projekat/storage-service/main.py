@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import threading
 import psycopg2
 from fastapi import FastAPI
@@ -9,7 +10,7 @@ from kafka import KafkaConsumer
 app = FastAPI(title="Data Storage Service")
 
 # === KONFIGURACIJA ===
-BROKER_TYPE = os.getenv("BROKER_TYPE", "mqtt")
+BROKER_TYPE = os.getenv("BROKER_TYPE", "kafka")  # Promenjeno na kafka jer ti je tako u composefajlu
 DB_HOST = "postgres_db"
 DB_NAME = "iot_p2_db"
 DB_USER = "vukasin"
@@ -22,22 +23,29 @@ batch_lock = threading.Lock()
 
 print(f"📊 Storage servis pokrenut! Sluša se: {BROKER_TYPE.upper()}")
 
-# --- INICIJALIZACIJA BAZE ---
+# --- INICIJALIZACIJA BAZE (sa čekanjem da se Postgres podigne) ---
 def init_db():
-    conn = psycopg2.connect(host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASS)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS sensor_measurements (
-            id SERIAL PRIMARY KEY,
-            device_id VARCHAR(50),
-            temperature REAL,
-            timestamp TIMESTAMP
-        );
-    """)
-    conn.commit()
-    cursor.close()
-    conn.close()
-    print("✔ Baza podataka je uspešno inicijalizovana!")
+    connected = False
+    while not connected:
+        try:
+            conn = psycopg2.connect(host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASS)
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS sensor_measurements (
+                    id SERIAL PRIMARY KEY,
+                    device_id VARCHAR(50),
+                    temperature REAL,
+                    timestamp TIMESTAMP
+                );
+            """)
+            conn.commit()
+            cursor.close()
+            conn.close()
+            print("✔ Baza podataka je uspešno inicijalizovana!")
+            connected = True
+        except Exception as e:
+            print("⏳ Baza još nije spremna, pokušavam ponovo za 3 sekunde...")
+            time.sleep(3)
 
 init_db()
 
@@ -49,7 +57,7 @@ def flush_batch(batch_to_write):
         conn = psycopg2.connect(host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASS)
         cursor = conn.cursor()
         
-        # SQL za masovni insert (brže od pojedinačnih upisa)
+        # SQL za masovni insert
         query = "INSERT INTO sensor_measurements (device_id, temperature, timestamp) VALUES (%s, %s, %s)"
         cursor.executemany(query, batch_to_write)
         
@@ -70,14 +78,28 @@ def handle_incoming_message(msg_body):
         with batch_lock:
             msg_batch.append(row)
             if len(msg_batch) >= BATCH_SIZE:
-                # Ako smo stigli do 500, uzmi ih i isprazni glavnu listu odmah
                 current_batch = msg_batch.copy()
                 msg_batch.clear()
-                # Pokreni upis u bazu u posebnom thread-u da ne koči prijem novih poruka
                 threading.Thread(target=flush_batch, args=(current_batch,)).start()
                 
     except Exception as e:
         print(f"❌ Greška prilikom obrade poruke: {e}")
+
+# --- TAJMER ZA ČIŠĆENJE PREOSTALIH PORUKA (Preventivni Flush) ---
+def start_periodic_flush_timer():
+    global msg_batch
+    while True:
+        time.sleep(3)  # Na svake 3 sekunde proveravaj
+        if msg_batch:
+            with batch_lock:
+                if msg_batch:  # Dupla provera unutar lock-a
+                    current_batch = msg_batch.copy()
+                    msg_batch.clear()
+                    print(f"⏱ Tajmer aktiviran: Upisujem preostalih {len(current_batch)} poruka.")
+                    threading.Thread(target=flush_batch, args=(current_batch,)).start()
+
+# Pokretanje tajmera u pozadini
+threading.Thread(target=start_periodic_flush_timer, daemon=True).start()
 
 # --- MQTT KLIJENT ---
 def start_mqtt():
@@ -87,7 +109,7 @@ def start_mqtt():
     client = mqtt.Client()
     client.on_message = on_message
     client.connect("mosquitto", 1883, 60)
-    client.subscribe(TOPIC_NAME, qos=0) # QoS menjamo u zavisnosti od testa
+    client.subscribe(TOPIC_NAME, qos=0)
     client.loop_forever()
 
 # --- KAFKA KONSUMER ---
@@ -102,7 +124,7 @@ def start_kafka():
     for msg in consumer:
         handle_incoming_message(msg.value)
 
-# Pokretanje slušanja u pozadinskom thread-u da ne blokira FastAPI
+# Pokretanje slušanja u pozadinskom thread-u
 if BROKER_TYPE == "mqtt":
     threading.Thread(target=start_mqtt, daemon=True).start()
 elif BROKER_TYPE == "kafka":

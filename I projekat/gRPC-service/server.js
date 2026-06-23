@@ -6,7 +6,9 @@ const PORT = process.env.GRPC_PORT || '50051';
 const BIND_ADDRESS = `0.0.0.0:${PORT}`;
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || "postgresql://Vukasin:18972@db:5432/iot_db"
+  connectionString: process.env.DATABASE_URL || "postgresql://Vukasin:18972@db:5432/iot_db",
+  max: 50,
+  idleTimeoutMillis: 30000
 });
 
 const packageDefinition = protoLoader.loadSync('./iot.proto', {});
@@ -15,7 +17,7 @@ const iotProto = grpc.loadPackageDefinition(packageDefinition).iot;
 const insertMeasurement = async (measurement) => {
   const query = {
     text: `
-      INSERT INTO measurements (device_id, temperature, humidity, voltage, light_intensity, timestamp)
+      INSERT INTO measurements ("deviceId", temperature, humidity, voltage, "lightIntensity", timestamp)
       VALUES ($1, $2, $3, $4, $5, $6::timestamp)
     `,
     values: [
@@ -37,9 +39,11 @@ const sendMeasurement = async (call, callback) => {
     callback(null, { status: "success", message: "Measurement successfully recorded." });
   } catch (err) {
     console.error(`Database insertion failed: ${err.message}`);
+    
+    // PROMENA: Vraćamo err.message nazad u k6 konzolu!
     callback({
       code: grpc.status.INTERNAL,
-      details: "Internal server error occurred while persisting data."
+      details: `DB Error: ${err.message}` 
     });
   }
 };
