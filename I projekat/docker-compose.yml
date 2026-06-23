@@ -11,6 +11,11 @@ services:
       - "5432:5432"
     volumes:
       - ./postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U Vukasin -d iot_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   rest-service:
     build: ./rest-service
@@ -18,10 +23,11 @@ services:
     restart: always
     ports:
       - "8000:8000"
-    depends_on:
-      - db
     environment:
       - DATABASE_URL=postgresql://Vukasin:18972@db:5432/iot_db
+    depends_on:
+      db:
+        condition: service_healthy 
 
   grpc-service:
     build: ./grpc-service
@@ -29,17 +35,30 @@ services:
     restart: always
     ports:
       - "50051:50051"
-    depends_on:
-      - db
     environment:
       - DATABASE_URL=postgresql://Vukasin:18972@db:5432/iot_db
-    
+    depends_on:
+      db:
+        condition: service_healthy
+
   graphql-service:
     build: ./graphql-service
     container_name: fastapi_graphql_service
+    restart: always
     ports:
-      - "8002:8000"
+      - "8001:8001" 
     environment:
       - DATABASE_URL=postgresql://Vukasin:18972@db:5432/iot_db
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+
+  k6:
+    image: grafana/k6
+    container_name: k6_test_runner
+    profiles:
+      - test
+    volumes:
+      - .:/apps
+    working_dir: /apps
+    command: run k6-test.js

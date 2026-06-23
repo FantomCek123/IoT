@@ -1,0 +1,105 @@
+services:
+  # --- BAZA PODATAKA ---
+  postgres_db:
+    image: postgres:15
+    container_name: iot_postgres_db_p2
+    environment:
+      POSTGRES_USER: vukasin
+      POSTGRES_PASSWORD: iotpassword
+      POSTGRES_DB: iot_p2_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_p2_data:/var/lib/postgresql/data
+    networks:
+      - iot_network
+
+  # --- MQTT BROKER (Mosquitto) ---
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: iot_mosquitto_p2
+    ports:
+      - "1883:1883" # Standardni MQTT port
+      - "9001:9001" # WebSockets port (opciono)
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+    networks:
+      - iot_network
+
+  # --- APACHE KAFKA (KRaft režim) ---
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: iot_kafka_p2
+    ports:
+      - "9092:9092"
+    environment:
+      # Pokretanje u KRaft režimu (bez Zookeeper-a) radi uštede resursa
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk' # Nasumični ID klastera
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+    networks:
+      - iot_network
+
+  # --- DATA INGESTION SERVICE (Simulator) ---
+  ingestion_service:
+    build: ./ingestion-service
+    container_name: iot_ingestion_p2
+    environment:
+      - BROKER_TYPE=kafka
+      - MQTT_QOS=0
+      - KAFKA_ACKS=1
+      - NUM_DEVICES=10000
+    volumes:
+      - ./intel_data.json:/app/intel_data.json # <--- OVIM REŠAVAŠ PROBLEM
+    depends_on:
+      - mosquitto
+      - kafka
+    networks:
+      - iot_network
+
+  # --- ANALYTICS SERVICE (Stream Processing) ---
+  analytics_service:
+    build: ./analytics-service
+    container_name: iot_analytics_p2
+    environment:
+      - BROKER_TYPE=kafka 
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8001:8001"
+    depends_on:
+      - mosquitto
+      - kafka
+    networks:
+      - iot_network
+
+# --- DATA STORAGE SERVICE ---
+  storage_service:
+    build: ./storage-service
+    container_name: iot_storage_p2
+    environment:
+      - BROKER_TYPE=kafka 
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres_db
+      - mosquitto
+      - kafka
+    networks:
+      - iot_network
+  
+
+networks:
+  iot_network:
+    name: iot_p2_network
+    driver: bridge
+
+volumes:
+  postgres_p2_data:

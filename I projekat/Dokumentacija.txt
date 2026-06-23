@@ -29,9 +29,6 @@ gRPC (Protobuf): Ukupna veličina 100 B (zahtev 76 B + odgovor 24 B).
 C. Iskorišćenost sistemskih resursa (Docker stats)
 
 fastapi_graphql_service: CPU 95.71%, RAM 70.28 MiB.
-
 fastapi_rest_service: CPU 89.50%, RAM 62.02 MiB.
-
 node_grpc_service: CPU 27.60%, RAM 71.37 MiB.
-
 iot_postgres_db: CPU 26.55%, RAM 44.2MiB.

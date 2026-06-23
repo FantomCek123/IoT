@@ -3,12 +3,11 @@ from datetime import datetime
 from typing import Optional
 
 class IoTMeasurementCreate(BaseModel):
-    device_id: str
+    deviceId: str
     temperature: float
     humidity: float
-    co2: float
     voltage: Optional[float] = None
-    light_intensity: Optional[float] = None
+    lightIntensity: Optional[float] = None
     timestamp: datetime
 
 class IoTMeasurement(IoTMeasurementCreate):

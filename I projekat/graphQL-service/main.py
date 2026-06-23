@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from strawberry.fastapi import GraphQLRouter
 from schema import schema
 
-app = FastAPI(title="IoT GraphQL Service - Scenario B")
+app = FastAPI(title="IoT GraphQL Service - Scenario B & C")
 
 graphql_app = GraphQLRouter(schema)
 
