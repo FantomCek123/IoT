@@ -1,135 +1,71 @@
-import os
-import json
-import time
 import threading
-import psycopg2
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
-import paho.mqtt.client as mqtt
-from kafka import KafkaConsumer
+import config
+from database import init_db
+from services.batch_processor import processor
 
-app = FastAPI(title="Data Storage Service")
-
-# === KONFIGURACIJA ===
-BROKER_TYPE = os.getenv("BROKER_TYPE", "kafka")  # Promenjeno na kafka jer ti je tako u composefajlu
-DB_HOST = "postgres_db"
-DB_NAME = "iot_p2_db"
-DB_USER = "vukasin"
-DB_PASS = "iotpassword"
-TOPIC_NAME = "iot_sensor_data"
-
-BATCH_SIZE = 500
-msg_batch = []
-batch_lock = threading.Lock()
-
-print(f"📊 Storage servis pokrenut! Sluša se: {BROKER_TYPE.upper()}")
-
-# --- INICIJALIZACIJA BAZE (sa čekanjem da se Postgres podigne) ---
-def init_db():
-    connected = False
-    while not connected:
-        try:
-            conn = psycopg2.connect(host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASS)
-            cursor = conn.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS sensor_measurements (
-                    id SERIAL PRIMARY KEY,
-                    device_id VARCHAR(50),
-                    temperature REAL,
-                    timestamp TIMESTAMP
-                );
-            """)
-            conn.commit()
-            cursor.close()
-            conn.close()
-            print("✔ Baza podataka je uspešno inicijalizovana!")
-            connected = True
-        except Exception as e:
-            print("⏳ Baza još nije spremna, pokušavam ponovo za 3 sekunde...")
-            time.sleep(3)
-
-init_db()
-
-# --- FUNKCIJA ZA BATCH UPIS ---
-def flush_batch(batch_to_write):
-    if not batch_to_write:
-        return
-    try:
-        conn = psycopg2.connect(host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASS)
-        cursor = conn.cursor()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- ON STARTUP ---
+    init_db()  # Prvo proveri i kreiraj tabelu
+    
+    # Pokretanje tajmera za flush
+    timer_thread = threading.Thread(target=processor.start_periodic_flush_timer, daemon=True)
+    timer_thread.start()
+    
+    if config.BROKER_TYPE == "mqtt":
+        from brokers.mqtt_consumer import start_mqtt
+        broker_thread = threading.Thread(target=start_mqtt, daemon=True)
+        broker_thread.start()
+    elif config.BROKER_TYPE == "kafka":
+        from brokers.kafka_consumer import start_kafka
+        broker_thread = threading.Thread(target=start_kafka, daemon=True)
+        broker_thread.start()
         
-        # SQL za masovni insert
-        query = "INSERT INTO sensor_measurements (device_id, temperature, timestamp) VALUES (%s, %s, %s)"
-        cursor.executemany(query, batch_to_write)
-        
-        conn.commit()
-        cursor.close()
-        conn.close()
-        print(f"💾 Uspešno upisan batch od {len(batch_to_write)} poruka u PostgreSQL.")
-    except Exception as e:
-        print(f"❌ Greška prilikom upisa u bazu: {e}")
+    yield
+    print("🛑 Zaustavljam Storage Service i čistim preostale bafere...")
+    processor.stop()
 
-# Funkcija koja dodaje poruku u batch
-def handle_incoming_message(msg_body):
-    global msg_batch
-    try:
-        data = json.loads(msg_body)
-        row = (data["device_id"], data["temperature"], data["timestamp"])
-        
-        with batch_lock:
-            msg_batch.append(row)
-            if len(msg_batch) >= BATCH_SIZE:
-                current_batch = msg_batch.copy()
-                msg_batch.clear()
-                threading.Thread(target=flush_batch, args=(current_batch,)).start()
-                
-    except Exception as e:
-        print(f"❌ Greška prilikom obrade poruke: {e}")
-
-# --- TAJMER ZA ČIŠĆENJE PREOSTALIH PORUKA (Preventivni Flush) ---
-def start_periodic_flush_timer():
-    global msg_batch
-    while True:
-        time.sleep(3)  # Na svake 3 sekunde proveravaj
-        if msg_batch:
-            with batch_lock:
-                if msg_batch:  # Dupla provera unutar lock-a
-                    current_batch = msg_batch.copy()
-                    msg_batch.clear()
-                    print(f"⏱ Tajmer aktiviran: Upisujem preostalih {len(current_batch)} poruka.")
-                    threading.Thread(target=flush_batch, args=(current_batch,)).start()
-
-# Pokretanje tajmera u pozadini
-threading.Thread(target=start_periodic_flush_timer, daemon=True).start()
-
-# --- MQTT KLIJENT ---
-def start_mqtt():
-    def on_message(client, userdata, msg):
-        handle_incoming_message(msg.payload.decode())
-
-    client = mqtt.Client()
-    client.on_message = on_message
-    client.connect("mosquitto", 1883, 60)
-    client.subscribe(TOPIC_NAME, qos=0)
-    client.loop_forever()
-
-# --- KAFKA KONSUMER ---
-def start_kafka():
-    consumer = KafkaConsumer(
-        TOPIC_NAME,
-        bootstrap_servers=['kafka:9092'],
-        group_id='storage-group',
-        auto_offset_reset='earliest',
-        value_deserializer=lambda x: x.decode('utf-8')
-    )
-    for msg in consumer:
-        handle_incoming_message(msg.value)
-
-# Pokretanje slušanja u pozadinskom thread-u
-if BROKER_TYPE == "mqtt":
-    threading.Thread(target=start_mqtt, daemon=True).start()
-elif BROKER_TYPE == "kafka":
-    threading.Thread(target=start_kafka, daemon=True).start()
+app = FastAPI(title="Data Storage Service", lifespan=lifespan)
 
 @app.get("/")
 def read_root():
-    return {"status": "running", "broker": BROKER_TYPE}
+    return {"status": "running", "broker": config.BROKER_TYPE}
+
+
+import json
+import time
+from pydantic import BaseModel
+
+class TestPayload(BaseModel):
+    deviceId: str
+    temperature: float
+    timestamp: str = None  # Ako ne pošalješ, generisaćemo ga dole
+
+@app.post("/test-direct-insert")
+async def test_direct_insert(payload: TestPayload):
+    try:
+        print(f"👉 Manuelno primljen podatak za {payload.deviceId}, procesiram...")
+        
+        # 1. Pošto handle_incoming_message očekuje string (JSON), spakovaćemo rečnik
+        # i pretvoriti ga u tekst preko json.dumps. 
+        # Pazimo da timestamp ima vrednost jer ti je obavezan u bazi.
+        msg_dict = {
+            "deviceId": payload.deviceId,
+            "temperature": payload.temperature,
+            "timestamp": payload.timestamp or time.strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        msg_body_string = json.dumps(msg_dict)
+        
+        # 2. Pozivamo tvoju funkciju i prosleđujemo joj JSON string
+        processor.handle_incoming_message(msg_body_string)
+        
+        return {
+            "status": "success", 
+            "message": f"Podatak ubačen u BatchProcessor za {payload.deviceId}. Sačekaj 3 sekunde da tajmer odradi flush u bazu."
+        }
+    except Exception as e:
+        print(f"❌ Greška unutar test endpointa: {str(e)}")
+        return {"status": "error", "message": str(e)}

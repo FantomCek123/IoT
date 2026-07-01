@@ -1,5 +1,5 @@
 services:
-  # --- BAZA PODATAKA ---
+  
   postgres_db:
     image: postgres:15
     container_name: iot_postgres_db_p2
@@ -14,7 +14,6 @@ services:
     networks:
       - iot_network
 
-  # --- MQTT BROKER (Mosquitto) ---
   mosquitto:
     image: eclipse-mosquitto:2.0
     container_name: iot_mosquitto_p2
@@ -26,7 +25,6 @@ services:
     networks:
       - iot_network
 
-  # --- APACHE KAFKA (KRaft režim) ---
   kafka:
     image: apache/kafka:3.7.0
     container_name: iot_kafka_p2
@@ -43,16 +41,16 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+      KAFKA_LOG4J_LOGGERS: "kafka.authorizer.logger=WARN,kafka.server=WARN,org.apache.kafka=WARN"
     networks:
       - iot_network
 
-  # --- DATA INGESTION SERVICE (Simulator) ---
-  # --- DATA INGESTION SERVICE (Simulator sa HTTP okidačem) ---
+
   ingestion_service:
     build: ./ingestion-service
     container_name: iot_ingestion_p2
     ports:
-      - "3000:3000"  # DODATO: otvaramo port za k6 HTTP pozive
+      - "3000:3000" 
     environment:
       - BROKER_TYPE=kafka
       - MQTT_QOS=0
@@ -65,7 +63,6 @@ services:
     networks:
       - iot_network
 
-  # --- ANALYTICS SERVICE (Stream Processing) ---
   analytics_service:
     build: ./analytics-service
     container_name: iot_analytics_p2
@@ -80,7 +77,6 @@ services:
     networks:
       - iot_network
 
-  # --- DATA STORAGE SERVICE ---
   storage_service:
     build: ./storage-service
     container_name: iot_storage_p2
@@ -96,9 +92,11 @@ services:
     networks:
       - iot_network
 
-  # --- K6 LOAD TESTING (Pokreće se isključivo ručno) ---
+
   k6:
-    image: grafana/k6:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.k6
     container_name: iot_k6_p2
     profiles:
       - tools

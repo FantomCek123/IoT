@@ -1,0 +1,16 @@
+FROM golang:1.23-alpine AS builder
+
+RUN apk add --no-cache git
+
+# Koristimo proverenu verziju xk6 alata koja ne traži Go 1.25
+RUN go install go.k6.io/xk6/cmd/xk6@v0.11.0
+
+# Sklapanje k6 izvršnog fajla sa ekstenzijama
+RUN xk6 build v0.51.0 \
+    --with github.com/grafana/xk6-kafka@v0.4.0 \
+    --with github.com/grafana/xk6-mqtt@v0.0.3
+
+FROM alpine:latest
+RUN apk add --no-cache libc6-compat
+COPY --from=builder /go/k6 /usr/bin/k6
+ENTRYPOINT ["k6"]

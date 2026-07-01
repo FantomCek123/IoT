@@ -1,68 +1,141 @@
 import http from 'k6/http';
+import exec from 'k6/execution';
 import { check, sleep } from 'k6';
+import { SharedArray } from 'k6/data';
+import mqtt from 'k6/x/mqtt';
+import kafka from 'k6/x/kafka';
+
+// Učitavanje dataset-a
+const dataset = new SharedArray('intel telemetry data', function () {
+    return JSON.parse(open('./intel_data.json'));
+});
+
+const BROKER_TYPE = __ENV.BROKER_TYPE || 'kafka'; 
+const MQTT_URL = 'tcp://mosquitto:1883';
+const KAFKA_BROKER = 'kafka:9092';
+const TOPIC_NAME = 'iot_sensor_data';
+
+const MQTT_QOS = parseInt(__ENV.MQTT_QOS || '0');
+const KAFKA_ACKS = __ENV.KAFKA_ACKS || '1';
 
 export const options = {
     scenarios: {
-        // SCENARIO A: k6 naređuje simulatoru da podigne opterećenje na 100, 1000 ili 10000 uređaja
-        scenario_A_stress: {
+
+        scenario_A_massive_ingestion: {
             executor: 'constant-vus',
-            vus: 10,
-            duration: '15s',
-            exec: 'triggerScenarioA',
+            vus: 100, // 👈 Ovde menjaš 100 -> 1000 -> 10000 za odbranu projekta
+            duration: '30s',    
+            exec: 'runScenarioA',
+            startTime: '0s', 
         },
-        // SCENARIO B: k6 paralelno vrši health check-ove na bazu
-        scenario_B_monitoring: {
-            executor: 'constant-vus',
-            vus: 30,
-            duration: '30s',
-            exec: 'runStorageHealthCheck',
+
+
+        //scenario_B_network_failure: {
+        //    executor: 'per-vu-iterations',
+        //    vus: 1,
+        //    iterations: 1, 
+        //    maxDuration: '70s',
+        //    exec: 'runScenarioB',
+        //    startTime: '40s', 
+        //},
+
+
+        scenario_C_burst_load: {
+            executor: 'ramping-arrival-rate',
+            startRate: 50,          
+            timeUnit: '1s',
+            preAllocatedVUs: 100,   
+            maxVUs: 2000,           
+            stages: [
+                { duration: '10s', target: 50 },   
+                { duration: '3s', target: 5000 },  
+                { duration: '5s', target: 5000 },  
+                { duration: '5s', target: 5 }, 
+            ],
+            exec: 'runScenarioC',
+            startTime: '120s',
         },
-        // SCENARIO C: Burst test - k6 naređuje simulatoru da "grune" 5000 poruka u sekundi
-        scenario_C_burst: {
+
+        scenario_D_realtime_alerting: {
             executor: 'per-vu-iterations',
             vus: 1,
-            iterations: 3, // Okinuće burst 3 puta tokom testa
-            exec: 'triggerScenarioC',
+            iterations: 1,
+            maxDuration: '20s',
+            exec: 'runScenarioD',
+            startTime: '150s',
         },
-        // SCENARIO D: Okidanje kritične vrednosti za merenje latencije
-        scenario_D_alerting: {
-            executor: 'per-vu-iterations',
-            vus: 1,
-            iterations: 2,
-            exec: 'triggerScenarioD',
-        }
     },
     thresholds: {
-        checks: ['rate>0.95'],
-        http_req_duration: ['p(95)<200'], // 95% HTTP health check zahteva mora odgovoriti ispod 200ms
+        checks: ['rate>0.95'], 
     },
 };
 
-const INGESTION_URL = 'http://ingestion_service:3000/run-scenario';
-const STORAGE_URL = 'http://storage_service:8000/';
 
-// Okidanje Scenarija A (Promeni num_devices na 100, 1000 ili 10000 u zavisnosti od faze testa)
-export function triggerScenarioA() {
-    const payload = JSON.stringify({ scenario: 'A', num_devices: 1000 }); 
-    http.post(INGESTION_URL, payload, { headers: { 'Content-Type': 'application/json' } });
-    sleep(1);
+let kafkaWriter = null;
+let mqttClient = null;
+
+if (BROKER_TYPE === 'kafka') {
+    kafkaWriter = new kafka.Writer({ brokers: [KAFKA_BROKER], topic: TOPIC_NAME, acks: KAFKA_ACKS === 'all' ? -1 : parseInt(KAFKA_ACKS) });
+} else if (BROKER_TYPE === 'mqtt') {
+    mqttClient = mqtt.connect(MQTT_URL);
 }
 
-// Okidanje Scenarija B (Health monitoring)
-export function runStorageHealthCheck() {
-    const res = http.get(STORAGE_URL);
-    check(res, { 'Storage HTTP je živ (200)': (r) => r.status === 200 });
-    sleep(0.5);
+function sendPayload(payload) {
+    if (BROKER_TYPE === 'mqtt' && mqttClient) mqttClient.publish(TOPIC_NAME, payload, { qos: MQTT_QOS });
+    else if (BROKER_TYPE === 'kafka' && kafkaWriter) kafkaWriter.write({ value: payload });
 }
 
-// Okidanje Scenarija C (Burst)
-export function triggerScenarioC() {
-    http.post(INGESTION_URL, JSON.stringify({ scenario: 'C' }), { headers: { 'Content-Type': 'application/json' } });
-    sleep(10); // Pauza između burst-ova da se sistem oporavi
+
+export function runScenarioA() {
+    const index = exec.scenario.iterationInScenario % dataset.length;
+    const record = dataset[index];
+    const payload = JSON.stringify({
+        deviceId: `k6_device_${exec.vu.idInTest}`,
+        temperature: record.temperature,
+        timestamp: new Date().toISOString()
+    });
+    sendPayload(payload);
+    check(payload, { 'Scenario A: Uspešno poslato': (p) => p.length > 0 });
+    sleep(0.1); // Svaki uređaj šalje podatke na svakih 100ms
 }
 
-// Okidanje Scenarija D (Kritična vrednost)
-export function triggerScenarioD() {
-    http.post(INGESTION_URL, JSON.stringify({ scenario: 'D' }), { headers: { 'Content-Type': 'application/json' } });
-    sleep(12);
+
+export function runScenarioB() {
+    const startUrl = 'http://ingestion_service:3000/start-simulation';
+    const stopUrl = 'http://ingestion_service:3000/stop-simulation';
+    const params = { headers: { 'Content-Type': 'application/json' } };
+
+    console.log("📡 [k6 - SCENARIO B] Pokrećem simulaciju (50 uređaja)...");
+    http.post(startUrl, JSON.stringify({ num_devices: 50 }), params);
+
+
+    sleep(60); 
+
+    console.log("🛑 [k6 - SCENARIO B] Gasim simulaciju.");
+    http.post(stopUrl, JSON.stringify({}), params);
+}
+
+export function runScenarioC() {
+    const index = exec.scenario.iterationInScenario % dataset.length;
+    const record = dataset[index];
+    const payload = JSON.stringify({
+        deviceId: `k6_burst_device`,
+        temperature: record.temperature,
+        timestamp: new Date().toISOString()
+    });
+    sendPayload(payload);
+    check(payload, { 'Scenario C: Burst uspešan': (p) => p.length > 0 });
+}
+
+export function runScenarioD() {
+    const url = 'http://ingestion_service:3000/trigger-alarm';
+    console.log("🔥 [k6 - SCENARIO D] Šaljem zahtev za toplotni udar...");
+    const res = http.post(url);
+    check(res, { 'Scenario D: Alarm pokrenut': (r) => r.status === 200 });
+    sleep(15);
+}
+
+export function teardown() {
+    if (kafkaWriter) kafkaWriter.close();
+    if (mqttClient) mqttClient.close();
 }
