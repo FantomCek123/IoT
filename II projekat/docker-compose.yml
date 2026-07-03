@@ -42,6 +42,9 @@ services:
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
       KAFKA_LOG4J_LOGGERS: "kafka.authorizer.logger=WARN,kafka.server=WARN,org.apache.kafka=WARN"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
     networks:
       - iot_network
 
@@ -52,7 +55,7 @@ services:
     ports:
       - "3000:3000" 
     environment:
-      - BROKER_TYPE=kafka
+      - BROKER_TYPE=mqtt # kafka
       - MQTT_QOS=0
       - KAFKA_ACKS=1
     volumes:
@@ -67,7 +70,7 @@ services:
     build: ./analytics-service
     container_name: iot_analytics_p2
     environment:
-      - BROKER_TYPE=kafka 
+      - BROKER_TYPE=mqtt # kafka 
       - PYTHONUNBUFFERED=1
     ports:
       - "8001:8001"
@@ -81,7 +84,7 @@ services:
     build: ./storage-service
     container_name: iot_storage_p2
     environment:
-      - BROKER_TYPE=kafka 
+      - BROKER_TYPE=mqtt # kafka
       - PYTHONUNBUFFERED=1
     ports:
       - "8000:8000"

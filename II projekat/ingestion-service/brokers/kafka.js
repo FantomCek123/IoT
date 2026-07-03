@@ -23,12 +23,18 @@ async function sendKafka(payload) {
     if (kafkaProducer) {
         const messageString = JSON.stringify(payload);
         try {
+            //await kafkaProducer.send({
+            //    topic: config.TOPIC_NAME,
+            //    acks: config.KAFKA_ACKS === 'all' ? -1 : parseInt(config.KAFKA_ACKS),
+            //    messages: [{ key: payload.deviceId, value: messageString }],
+            //});
             await kafkaProducer.send({
                 topic: config.TOPIC_NAME,
-                acks: config.KAFKA_ACKS === 'all' ? -1 : parseInt(config.KAFKA_ACKS),
-                messages: [{ key: payload.deviceId, value: messageString }],
+                messages: [{ 
+                    key: String(payload.deviceId), 
+                    value: String(messageString) // Prisilno kastujemo u String
+                }],
             });
-
             console.log(` -> Poruka poslata na Kafku za: ${payload.deviceId}`); 
         } catch (error) {
 

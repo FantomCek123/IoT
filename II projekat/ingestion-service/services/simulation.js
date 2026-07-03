@@ -27,13 +27,13 @@ function startRealTimeSimulation(numDevices) {
     console.log(`📡 Pokrenuta kontinuirana simulacija za ${numDevices} uređaja`);
     
     simulationInterval = setInterval(() => {
-    console.log(`Sending batch for ${numDevices} devices...`); // <-- DODAJ OVO
+    console.log(`Sending batch for ${numDevices} devices...`); 
     for (let i = 1; i <= numDevices; i++) {
-        try {                                                  // <-- DODAJ OVO
+        try {                                                   
             if (datasetIndex >= dataset.length) datasetIndex = 0;
             const originalRecord = dataset[datasetIndex++];
 
-            if (!originalRecord) continue;                     // <-- ZAŠTITA
+            if (!originalRecord) continue;                     
 
             const payload = {
                 deviceId: `${originalRecord.device_id || 'sensor'}_sensor_${i}`, 

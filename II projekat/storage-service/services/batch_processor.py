@@ -26,7 +26,6 @@ class BatchProcessor:
             print(f"❌ Greška prilikom obrade poruke: {e}")
 
     def start_periodic_flush_timer(self):
-        """Metoda koja se vrti u pozadinskom thread-u i radi preventivni flush"""
         while self.is_running:
             time.sleep(3)
             if self.msg_batch:
@@ -39,7 +38,6 @@ class BatchProcessor:
 
     def stop(self):
         self.is_running = False
-        # Pred gašenje pokupi preostale poruke ako ih ima
         if self.msg_batch:
             insert_batch(self.msg_batch)
 

@@ -40,7 +40,6 @@ const sendMeasurement = async (call, callback) => {
   } catch (err) {
     console.error(`Database insertion failed: ${err.message}`);
     
-    // PROMENA: Vraćamo err.message nazad u k6 konzolu!
     callback({
       code: grpc.status.INTERNAL,
       details: `DB Error: ${err.message}` 

@@ -1,3 +1,9 @@
+KOMANDE:
+docker compose up -d
+
+docker stats
+docker compose --profile test run --rm k6
+
 OPIS IMPLEMENTIRANIH SERVISA
 
 REST Service
