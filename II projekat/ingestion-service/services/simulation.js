@@ -7,7 +7,7 @@ let simulationInterval = null;
 let alarmInterval = null;
 let datasetIndex = 0;
 let dataset = [];
-
+let currentNumDevices = 0;
 
 try {
     dataset = JSON.parse(fs.readFileSync(config.datasetPath, 'utf8'));
@@ -23,12 +23,20 @@ function sendToActiveBroker(payload) {
 }
 
 function startRealTimeSimulation(numDevices) {
-    if (simulationInterval) clearInterval(simulationInterval);
-    console.log(`📡 Pokrenuta kontinuirana simulacija za ${numDevices} uređaja`);
+
+
+    if (simulationInterval) {
+        clearInterval(simulationInterval);
+        console.log(`🔄 Resetujem simulaciju za novi broj uređaja: ${numDevices}`);
+    } else {
+        console.log(`📡 Pokrenuta kontinuirana simulacija za ${numDevices} uređaja`);
+    }
     
+    currentNumDevices = numDevices;
+
     simulationInterval = setInterval(() => {
-    console.log(`Sending batch for ${numDevices} devices...`); 
-    for (let i = 1; i <= numDevices; i++) {
+    console.log(`Sending batch for ${currentNumDevices} devices...`); 
+    for (let i = 1; i <= currentNumDevices; i++) {
         try {                                                   
             if (datasetIndex >= dataset.length) datasetIndex = 0;
             const originalRecord = dataset[datasetIndex++];
@@ -36,7 +44,7 @@ function startRealTimeSimulation(numDevices) {
             if (!originalRecord) continue;                     
 
             const payload = {
-                deviceId: `${originalRecord.device_id || 'sensor'}_sensor_${i}`, 
+                deviceId: `${originalRecord.deviceId || 'sensor'}_sensor_${i}`, 
                 temperature: originalRecord.temperature,
                 humidity: originalRecord.humidity || 0.0,
                 lightIntensity: originalRecord.lightIntensity || originalRecord.light_intensity || 0.0,
@@ -45,7 +53,7 @@ function startRealTimeSimulation(numDevices) {
             };
             sendToActiveBroker(payload);
         } catch (err) {
-            console.error("Greška unutar petlje simulacije:", err.message); // <-- DODAJ OVO
+            console.error("Greška unutar petlje simulacije:", err.message);
         }
     }
 }, 1000); 
@@ -65,11 +73,16 @@ function runCriticalAlarmStream() {
     console.log(`🚨 [Scenario D] Pokretanje toplotnog udara...`);
 
     alarmInterval = setInterval(() => {
+        const currentTimestamp = new Date().toISOString();
+        
         const payload = {
             deviceId: `critical_sensor_999`,
             temperature: 65.5,
-            timestamp: new Date().toISOString()
+            timestamp: currentTimestamp
         };
+        
+        console.log(`📤 [Poslato] Temp: ${payload.temperature}°C | Time: ${currentTimestamp}`);
+        
         sendToActiveBroker(payload);
     }, 1000);
 
@@ -78,5 +91,4 @@ function runCriticalAlarmStream() {
         console.log(`🛑 [Scenario D] Toplotni udar završen.`);
     }, 12000);
 }
-
 module.exports = { startRealTimeSimulation, stopRealTimeSimulation, runCriticalAlarmStream };

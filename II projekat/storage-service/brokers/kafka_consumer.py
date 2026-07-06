@@ -12,53 +12,28 @@ logger = logging.getLogger("KafkaConsumer")
 def start_kafka():
     consumer = None
     
-    while consumer is None:
+    while not consumer:
         try:
-            logger.info("⏳ Pokušavam povezivanje na Kafku...")
+            logger.info("Pokušavam povezivanje na Kafku...")
             consumer = KafkaConsumer(
                 TOPIC_NAME,
                 bootstrap_servers=['kafka:9092'],
                 group_id='storage-group-v2',
-                auto_offset_reset='earliest',
-                value_deserializer=lambda x: x.decode('utf-8'),
-                consumer_timeout_ms=1000  
+                value_deserializer=lambda x: x.decode('utf-8')
             )
-            logger.info("✔ Uspešno povezan na Kafku! Potrošač je pokrenut u pozadini.")
-        except NoBrokersAvailable:
-            logger.warning("❌ Kafka broker još nije spreman, ponovni pokušaj za 3 sekunde...")
-            time.sleep(3)
-        except Exception as e:
-            logger.error(f"❌ Neočekivana greška pri inicijalizaciji consumera: {e}")
+            logger.info("Povezan na Kafku!")
+        except Exception:
+            logger.warning("Kafka nije spremna, čekam 3s...")
             time.sleep(3)
 
     try:
-        while True:
-            try:
-                for msg in consumer:
-                    if msg.value is None:
-                        logger.warning("⚠️ Primljena je prazna poruka (tombstone) sa Kafke.")
-                        continue
-                    
-                    # Logujemo tačne metapodatke da vidiš ŠTA se dešava, sa koje particije i ofseta
-                    logger.info(f"📥 [Poruka primljena] Topic: {msg.topic} | Particija: {msg.partition} | Offset: {msg.offset}")
-                    logger.info(f"📄 Sadržaj: {msg.value[:100]}...") # Printamo prvih 100 karaktera radi preglednosti
-                    
-                    # Prosleđujemo procesoru
-                    processor.handle_incoming_message(msg.value)
-                    
-            except Exception as inner_error:
-                # Ako pukne parsiranje JEDNE poruke, hvatamo grešku OVDE.
-                # Petlja se NE prekida, idemo na sledeću poruku!
-                logger.error(f"❌ Greška prilikom obrade pojedinačne poruke: {inner_error}")
+        for msg in consumer:
+            if not msg.value: continue
+            logger.info(f"Primljeno | Offset: {msg.offset} | Uređaj: {msg.value[:20]}...")
+            processor.handle_incoming_message(msg.value)
             
-            # Kratka pauza (cool-down) pre nego što ponovo pitamo Kafku za poruke
-            time.sleep(0.1)
-
-    except KeyboardInterrupt:
-        logger.info("🛑 Ručno zaustavljanje potrošača (Ctrl+C)...")
+    except Exception as e:
+        logger.error(f"Greška u petlji: {e}")
     finally:
-        # 3. SIGURNO ZATVARANJE RESURSA (Garantuje da se konekcija očisti na gašenju)
-        logger.info("🔌 Zatvaram Kafka consumer konekciju...")
-        if consumer:
-            consumer.close()
-        logger.info("✔ Konekcija uspešno zatvorena.")
+        consumer.close()
+        logger.info("Konekcija zatvorena.")
