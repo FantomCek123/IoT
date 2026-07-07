@@ -1,0 +1,15 @@
+{
+  "streams": {
+    "tvoj_strim": "CREATE STREAM tvoj_strim (deviceId STRING, temperature BIGINT) WITH (DATASOURCE=\"tvoja/mqtt/tema\", FORMAT=\"json\");"
+  },
+  "rules": {
+    "rule_anomalija": {
+      "sql": "SELECT * FROM tvoj_strim WHERE temperature > 60",
+      "actions": [
+        {
+          "log": { "format": "json" }
+        }
+      ]
+    }
+  }
+}

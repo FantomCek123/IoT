@@ -95,6 +95,24 @@ services:
     networks:
       - iot_network
 
+  ekuiper:
+    image: lfedge/ekuiper:1.13-alpine
+    container_name: iot_ekuiper_p3
+    ports:
+      - "9081:9081"
+    volumes:
+      - ./ekuiper_init/rules.json:/kuiper/data/rules.json
+    networks:
+      - iot_network
+
+  maas-service:
+      build: ./maas-service
+      container_name: iot_maas_p3
+      ports:
+        - "8050:8000"
+      networks:
+        - iot_network
+
 networks:
   iot_network:
     name: iot_p2_network
