@@ -1,58 +1,31 @@
-SCENARIO A KOMANDE: (1 TERMINAL)
-    docker compose up
+=
 
-    KAFKA:
-        docker exec -it iot_kafka_p2 /opt/kafka/bin/kafka-producer-perf-test.sh --topic sensor_measurements --num-records 100000 --record-size 100 --throughput -1 --producer-props bootstrap.servers=localhost:9092 acks=0 num.threads=10
-        docker exec -it iot_kafka_p2 /opt/kafka/bin/kafka-producer-perf-test.sh --topic sensor_measurements --num-records 100000 --record-size 100 --throughput -1 --producer-props bootstrap.servers=localhost:9092 acks=1 num.threads=10
-        docker exec -it iot_kafka_p2 /opt/kafka/bin/kafka-producer-perf-test.sh --topic sensor_measurements --num-records 100000 --record-size 100 --throughput -1 --producer-props bootstrap.servers=localhost:9092 acks=all num.threads=10
-        docker exec -it iot_kafka_p2 /opt/kafka/bin/kafka-producer-perf-test.sh --topic sensor_measurements --num-records 500000 --record-size 100 --throughput -1 --producer-props bootstrap.servers=localhost:9092 acks=0 num.threads=50
-        docker exec -it iot_kafka_p2 /opt/kafka/bin/kafka-producer-perf-test.sh --topic sensor_measurements --num-records 500000 --record-size 100 --throughput -1 --producer-props bootstrap.servers=localhost:9092 acks=1 num.threads=50
-        docker exec -it iot_kafka_p2 /opt/kafka/bin/kafka-producer-perf-test.sh --topic sensor_measurements --num-records 500000 --record-size 100 --throughput -1 --producer-props bootstrap.servers=localhost:9092 acks=all num.threads=50
-        docker exec -it iot_kafka_p2 /opt/kafka/bin/kafka-producer-perf-test.sh --topic sensor_measurements --num-records 1000000 --record-size 100 --throughput -1 --producer-props bootstrap.servers=localhost:9092 acks=0 num.threads=100
-        docker exec -it iot_kafka_p2 /opt/kafka/bin/kafka-producer-perf-test.sh --topic sensor_measurements --num-records 1000000 --record-size 100 --throughput -1 --producer-props bootstrap.servers=localhost:9092 acks=1 num.threads=100
-        docker exec -it iot_kafka_p2 /opt/kafka/bin/kafka-producer-perf-test.sh --topic sensor_measurements --num-records 1000000 --record-size 100 --throughput -1 --producer-props bootstrap.servers=localhost:9092 acks=all num.threads=100
-
-    MQTT:
-        docker run --rm --network="iot_p2_network" emqx/emqtt-bench pub -h iot_mosquitto_p2 -p 1883 -t "sensors/measurements" -c 100 -I 10 -q 0
-        docker run --rm --network="iot_p2_network" emqx/emqtt-bench pub -h iot_mosquitto_p2 -p 1883 -t "sensors/measurements" -c 100 -I 10 -q 1
-        docker run --rm --network="iot_p2_network" emqx/emqtt-bench pub -h iot_mosquitto_p2 -p 1883 -t "sensors/measurements" -c 100 -I 10 -q 2
-        docker run --rm --network="iot_p2_network" emqx/emqtt-bench pub -h iot_mosquitto_p2 -p 1883 -t "sensors/measurements" -c 1000 -I 10 -q 0
-        docker run --rm --network="iot_p2_network" emqx/emqtt-bench pub -h iot_mosquitto_p2 -p 1883 -t "sensors/measurements" -c 1000 -I 10 -q 1
-        docker run --rm --network="iot_p2_network" emqx/emqtt-bench pub -h iot_mosquitto_p2 -p 1883 -t "sensors/measurements" -c 1000 -I 10 -q 2
-        docker run --rm --network="iot_p2_network" emqx/emqtt-bench pub -h iot_mosquitto_p2 -p 1883 -t "sensors/measurements" -c 10000 -I 50 -q 0
-        docker run --rm --network="iot_p2_network" emqx/emqtt-bench pub -h iot_mosquitto_p2 -p 1883 -t "sensors/measurements" -c 10000 -I 50 -q 1
-        docker run --rm --network="iot_p2_network" emqx/emqtt-bench pub -h iot_mosquitto_p2 -p 1883 -t "sensors/measurements" -c 10000 -I 50 -q 2
-
-SCENARIO B KOMANDE:  (2 TERMINALA)
-
-    1.
-    docker compose up
-
-    2.
-    Invoke-RestMethod -Uri "http://localhost:3000/start-simulation" -Method Post -ContentType "application/json" -Body '{"num_devices": 1}'
-    docker network disconnect iot_p2_network iot_storage_p2
-    docker network connect iot_p2_network iot_storage_p2        //POSLE 30s
-
-SCENARIO c KOMANDE: (3 TERMINALA)
+PODIZANJE INFRASTRUKTURE I KREIRANJE CEP STRIMA (1 TERMINAL)
     1.
     docker compose up -d
-    Invoke-RestMethod -Uri "http://localhost:3000/start-simulation" -Method Post -Body '{"num_devices": 50}' -ContentType "application/json"  
-    Invoke-RestMethod -Uri "http://localhost:3000/start-simulation" -Method Post -Body '{"num_devices": 5000}' -ContentType "application/json"  
-    Invoke-RestMethod -Uri "http://localhost:3000/stop-simulation" -Method Post    
 
-    2. 
-    docker stats
+    2. Kreiranje eKuiper strima:
+    $streamBody = '{"sql": "CREATE STREAM iot_stream () WITH (DATASOURCE=\"iot_sensor_data\", FORMAT=\"json\", TYPE=\"mqtt\", CONF_KEY=\"default\")"}'
+    Invoke-RestMethod -Uri "http://localhost:9081/streams" -Method Post -Body $streamBody -ContentType "application/json"
 
-    3.
-    docker logs -f iot_storage_p2
+    3. Kreiranje eKuiper pravila:
+    $ruleBody = '{"id": "rule_ekuiper_alarm", "sql": "SELECT temperature, \"ALARM: Visoka temperatura!\" as poruka FROM iot_stream WHERE temperature > 50", "actions": [{"mqtt": {"server": "tcp://iot_mosquitto_p2:1883", "topic": "sensors/ekuiper_alarms", "sendSingle": true}}]}'
+    Invoke-RestMethod -Uri "http://localhost:9081/rules" -Method Post -Body $ruleBody -ContentType "application/json"
 
-SCENARIO D KOMANDE: (2 TERMINALA)
 
-    1.
-    docker compose up -d
-    docker logs -f iot_analytics_p2
-    
-    2.
-    Invoke-RestMethod -Uri "http://localhost:3000/trigger-alarm" -Method Post
-    docker logs -f iot_ingestion_p2 
-    
+PROVERA RADNOG STANJA MAAS SERVIS ENDPOINT-A (1 TERMINAL)
+    Slanje testne normalne temperature na ML model:
+    Invoke-RestMethod -Uri "http://localhost:8050/predict" -Method Post -Body '{"temperature": 24.5}' -ContentType "application/json"
+
+    Slanje testne kritične temperature na ML model:
+    Invoke-RestMethod -Uri "http://localhost:8050/predict" -Method Post -Body '{"temperature": 65.5}' -ContentType "application/json"
+
+
+INTEGRISANI PIPELINE ANALITIKE I CEP-A (2 TERMINALA)
+
+ 1:
+   docker logs -f iot_analytics_p2
+
+ 2:
+   Invoke-RestMethod -Uri "http://localhost:3000/trigger-critical-alarm" -Method Post
+   docker logs -f iot_ingestion_p2
