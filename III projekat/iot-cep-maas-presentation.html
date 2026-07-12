@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<!-- skill:chassis -->
+<style>
+/* =====================================================
+   PRESENTATION CHASSIS — style-invariant base styles
+   Fixed 1920×1080 canvas scaled to fit any viewport.
+   Customize colors, fonts, and chrome via :root tokens.
+   ===================================================== */
+
+/* ---------- Universal reset ---------- */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ---------- Theme tokens (override in your deck's CSS) ---------- */
+:root {
+    color-scheme: light;
+
+    --background:      #ffffff;
+    --foreground:      #111111;
+    --card:            #f5f5f5;
+    --card-foreground: var(--foreground);
+    --accent:          #c94a3d;
+    --accent-foreground: #ffffff;
+
+    --muted-foreground: color-mix(in srgb, var(--foreground) 55%, transparent);
+    --border:           color-mix(in srgb, var(--foreground) 12%, transparent);
+
+    --font-display: Georgia, serif;
+    --font-body: -apple-system, system-ui, sans-serif;
+    --font-mono: ui-monospace, monospace;
+
+    /* Reveal animation */
+    --reveal-duration: 0.8s;
+    --reveal-ease:     cubic-bezier(0.16, 1, 0.3, 1);
+    --reveal-distance: 28px;
+
+    /* Chrome (nav dots, keyboard hint) */
+    --nav-dot-size: 9px;
+    --nav-dot-radius: 50%;
+    --nav-dot-color: var(--foreground);
+    --nav-dot-active-color: var(--accent);
+    --nav-dot-opacity: 0.4;
+}
+
+/* ---------- Viewport lock + scroll snap ---------- */
+html, body { height: 100%; overflow-x: hidden; }
+html {
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+}
+
+html, body {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+}
+
+/* ---------- Type scale ----------
+   Fixed px sizes on a 1920×1080 canvas. The canvas is scaled to fit
+   any viewport via transform, so these sizes are absolute within the
+   design surface — no responsive units needed. */
+body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-body);
+    font-size: 36px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+h1 { font-size: 120px; line-height: 1.05; letter-spacing: -0.02em; }
+h2 { font-size: 64px; line-height: 1.1; letter-spacing: -0.01em; }
+h3 { font-size: 44px; line-height: 1.2; }
+.eyebrow {
+    font-size: 24px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    line-height: 1.3;
+}
+
+ul, ol { padding-left: 48px; display: flex; flex-direction: column; gap: 24px; }
+li::marker { color: var(--accent); }
+
+/* ---------- Slide structure ----------
+   .slide is the authored 1920×1080 artboard.
+   The chassis wraps it in viewport + scale layers at runtime. */
+.slide-viewport {
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    display: block;
+    position: relative;
+    background: var(--background);
+    isolation: isolate;
+    z-index: 1;
+}
+
+.slide-scale {
+    width: 1920px;
+    height: 1080px;
+    transform: translate(-50%, -50%) scale(var(--slide-scale, 1));
+    transform-origin: center center;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 1;
+}
+
+.slide {
+    width: 1920px;
+    height: 1080px;
+    padding: 80px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 60px;
+    position: relative;
+    background: transparent;
+}
+
+
+/* ---------- Image defaults ---------- */
+img, .image-container {
+    max-width: 100%;
+    max-height: 540px;
+    object-fit: contain;
+}
+
+/* ---------- Reveal primitives ----------
+   Driven by chassis.js via the Web Animations API, not CSS transitions.
+   Put .reveal* or .step on ANY element — author CSS on the same element
+   (opacity, transform, transition, filter) never conflicts, because
+   WAAPI animations live in the animation cascade origin and win over
+   normal author declarations. The .dN stagger classes below still apply
+   to theme-authored CSS animations via animation-delay.
+
+   Variants: .reveal (fade + up), .reveal-left, .reveal-right,
+   .reveal-scale, .reveal-blur. .step stays hidden until the user
+   advances forward. Don't combine .step with .reveal* on the same
+   element. */
+
+/* FOUC guard: hide reveals until chassis.js marks the document ready. */
+:root:not(.reveals-ready) .reveal,
+:root:not(.reveals-ready) .reveal-left,
+:root:not(.reveals-ready) .reveal-right,
+:root:not(.reveals-ready) .reveal-scale,
+:root:not(.reveals-ready) .reveal-blur,
+:root:not(.reveals-ready) .step {
+    opacity: 0;
+}
+:root:not(.reveals-ready) .reveal-blur { filter: blur(10px); }
+
+/* ---------- Stagger delays (.d1 … .d8) ---------- */
+.slide.visible .d1 { transition-delay: 0.10s; animation-delay: 0.10s; }
+.slide.visible .d2 { transition-delay: 0.25s; animation-delay: 0.25s; }
+.slide.visible .d3 { transition-delay: 0.40s; animation-delay: 0.40s; }
+.slide.visible .d4 { transition-delay: 0.55s; animation-delay: 0.55s; }
+.slide.visible .d5 { transition-delay: 0.70s; animation-delay: 0.70s; }
+.slide.visible .d6 { transition-delay: 0.85s; animation-delay: 0.85s; }
+.slide.visible .d7 { transition-delay: 1.00s; animation-delay: 1.00s; }
+.slide.visible .d8 { transition-delay: 1.15s; animation-delay: 1.15s; }
+
+/* ---------- Nav dots ----------
+   Default: right-center (vertical stack on right edge).
+   Override with <body data-nav="bottom | top-right | hidden">. */
+.nav-dots {
+    position: fixed;
+    right: clamp(0.6rem, 1.5vw, 1.4rem);
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(0.5rem, 1vh, 0.8rem);
+    z-index: 50;
+}
+
+body[data-nav="bottom"] .nav-dots {
+    right: auto;
+    top: auto;
+    bottom: clamp(1rem, 2.5vh, 2rem);
+    left: 50%;
+    transform: translateX(-50%);
+    flex-direction: row;
+}
+
+body[data-nav="top-right"] .nav-dots {
+    right: clamp(1rem, 2.5vw, 2rem);
+    top: clamp(1rem, 2.5vh, 2rem);
+    transform: none;
+    flex-direction: row;
+}
+
+body[data-nav="hidden"] .nav-dots { display: none; }
+
+body[data-nav="bottom"] .keyboard-hint {
+    left: clamp(1rem, 2vw, 1.5rem);
+    transform: none;
+}
+
+.nav-dots button {
+    width: var(--nav-dot-size);
+    height: var(--nav-dot-size);
+    border-radius: var(--nav-dot-radius);
+    border: 1.5px solid var(--nav-dot-color);
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.3s ease;
+    opacity: var(--nav-dot-opacity);
+}
+.nav-dots button:hover { opacity: 0.85; transform: scale(1.15); }
+.nav-dots button:focus-visible {
+    outline: 2px solid var(--nav-dot-active-color);
+    outline-offset: 3px;
+    opacity: 1;
+}
+.nav-dots button.active {
+    background: var(--nav-dot-active-color);
+    border-color: var(--nav-dot-active-color);
+    opacity: 1;
+    transform: scale(1.2);
+}
+
+/* ---------- Keyboard hint ---------- */
+.keyboard-hint {
+    position: fixed;
+    bottom: clamp(0.6rem, 1.2vh, 1rem);
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-body);
+    font-size: 14px;
+    color: var(--muted-foreground);
+    z-index: 50;
+    opacity: 0.7;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+}
+.keyboard-hint kbd {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.9em;
+    padding: 0.05em 0.4em;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--background);
+    margin: 0 0.15em;
+}
+
+/* ---------- Credit line ---------- */
+.chassis-credit {
+    position: fixed;
+    bottom: clamp(0.6rem, 1.2vh, 1rem);
+    left: clamp(1rem, 2vw, 1.5rem);
+    font-family: var(--font-body);
+    font-size: 14px;
+    color: var(--muted-foreground);
+    letter-spacing: 0.02em;
+    z-index: 50;
+    opacity: 0.7;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+}
+.chassis-credit .chassis-credit-emoji {
+    font-style: normal;
+    margin: 0 0.15em;
+}
+
+body[data-nav="bottom"] .chassis-credit {
+    left: auto;
+    right: clamp(1rem, 2vw, 1.5rem);
+}
+
+/* ---------- Custom cursor ---------- */
+.chassis-cursor {
+    position: fixed;
+    top: 0; left: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    pointer-events: none;
+    background: var(--accent);
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    will-change: transform;
+}
+.chassis-cursor.visible { opacity: 1; }
+body.artifact-editor-editing .chassis-cursor { display: none; }
+
+@media (hover: none) {
+    .chassis-cursor { display: none; }
+}
+
+body.chassis-cursor-active:not(.artifact-editor-editing),
+body.chassis-cursor-active:not(.artifact-editor-editing) * { cursor: none; }
+
+/* ---------- Opt-outs ---------- */
+body[data-no-chrome] .nav-dots,
+body[data-no-chrome] .keyboard-hint,
+body[data-no-chrome] .chassis-credit,
+body[data-no-chrome] .chassis-cursor,
+body[data-no-chrome] .artifact-editor-toggle { display: none; }
+
+:fullscreen .keyboard-hint,
+:fullscreen .chassis-credit,
+:fullscreen .artifact-editor-toggle { display: none; }
+
+@media (hover: none) {
+    .keyboard-hint,
+    .chassis-credit { display: none; }
+}
+
+@media (max-width: 900px), (max-height: 560px) {
+    .nav-dots,
+    .keyboard-hint,
+    .chassis-credit,
+    .chassis-cursor { display: none; }
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.2s !important;
+    }
+    html { scroll-behavior: auto; }
+}
+
+/* ---------- Print (PDF export) ---------- */
+@media print {
+    .nav-dots, .keyboard-hint, .chassis-credit, .chassis-cursor { display: none !important; }
+    html, body { height: auto; overflow: visible; }
+    html { scroll-snap-type: none; }
+    .slide-viewport {
+        page-break-after: always;
+        break-after: page;
+        height: 100vh;
+    }
+    .slide-scale {
+        position: static !important;
+        transform: none !important;
+        width: 100% !important;
+        height: auto !important;
+    }
+    .slide {
+        width: 100% !important;
+        height: auto !important;
+    }
+}
+
+</style>
+<script>
+/* =====================================================
+   PRESENTATION CHASSIS — slide controller
+   Auto-initializes on DOMContentLoaded.
+   Exposes window.slides for programmatic control.
+   ===================================================== */
+(function () {
+    'use strict';
+
+    const REVEAL_SELECTOR = '.reveal, .reveal-left, .reveal-right, .reveal-scale, .reveal-blur';
+    const STEP_SELECTOR = '.step';
+    const ALL_REVEAL_SELECTOR = REVEAL_SELECTOR + ', ' + STEP_SELECTOR;
+    const VIEWPORT_CLASS = 'slide-viewport';
+    const SCALE_CLASS = 'slide-scale';
+
+    function _detectLang() {
+        const param = new URLSearchParams(location.search).get('lang');
+        return (param || navigator.language || 'en').slice(0, 2).toLowerCase();
+    }
+
+    class SlidePresentation {
+        constructor() {
+            this.slides = Array.from(document.querySelectorAll('.slide'));
+            if (this.slides.length === 0) return;
+
+            // Ensure every slide has an id so hashes + anchor links work.
+            // Author-defined ids are preserved; the rest get slide-N (1-indexed).
+            this.slides.forEach((slide, idx) => {
+                if (!slide.id) slide.id = `slide-${idx + 1}`;
+            });
+            this.viewports = this._setupViewports();
+            this.scales = this.viewports.map((viewport) => viewport.querySelector(`.${SCALE_CLASS}`));
+
+            // Hide every reveal element BEFORE lifting the CSS FOUC guard.
+            // After this, .reveals-ready is on <html>, so CSS no longer hides
+            // reveals — inline styles keep them hidden until JS animates them.
+            this._setupReveals();
+
+            this.navDotsContainer = this._ensureNavDots();
+            this.keyboardHint = this._ensureKeyboardHint();
+            this.credit = this._ensureCredit();
+
+            this._setupCanvasScale();
+            this._setupIntersectionObserver();
+            this._setupKeyboardNav();
+            this._setupWheelNav();
+            this._setupTouchNav();
+            this._setupViewportSync();
+            this._buildNavDots();
+            this._setupHashNav();
+            this._setupCursor();
+            this._setupPrintSettling();
+
+            // If URL has a matching hash, start there; otherwise start at slide 0.
+            const initial = this._slideIndexFromHash(location.hash);
+            this.currentSlide = initial >= 0 ? initial : 0;
+            if (this.currentSlide !== 0) {
+                this._scrollToSlide(this.currentSlide, 'auto');
+            }
+            // Reveal initial slide immediately (observer may miss it on load).
+            const first = this.slides[this.currentSlide];
+            first.classList.add('visible');
+            this._playSlideReveals(first);
+            this._updateNavDots();
+        }
+
+        /* ---------- Viewport scaffolding ----------
+           Authors write .slide as the 1920×1080 artboard. The chassis wraps
+           that authored section in viewport and scale layers. */
+        _setupViewports() {
+            return this.slides.map((slide) => {
+                const existingScale = slide.parentElement?.classList.contains(SCALE_CLASS)
+                    ? slide.parentElement
+                    : null;
+                const existingViewport = existingScale?.parentElement?.classList.contains(VIEWPORT_CLASS)
+                    ? existingScale.parentElement
+                    : null;
+                if (existingViewport) {
+                    this._syncViewportBackground(slide, existingViewport);
+                    return existingViewport;
+                }
+
+                const viewport = document.createElement('div');
+                viewport.className = VIEWPORT_CLASS;
+                const scale = document.createElement('div');
+                scale.className = SCALE_CLASS;
+
+                slide.parentNode.insertBefore(viewport, slide);
+                viewport.appendChild(scale);
+                scale.appendChild(slide);
+                this._syncViewportBackground(slide, viewport);
+
+                return viewport;
+            });
+        }
+
+        _syncViewportBackground(slide, viewport) {
+            const style = getComputedStyle(slide);
+            const hasBackgroundImage = style.backgroundImage && style.backgroundImage !== 'none';
+            const hasBackgroundColor = !['rgba(0, 0, 0, 0)', 'transparent'].includes(style.backgroundColor);
+            if (hasBackgroundImage || hasBackgroundColor) {
+                viewport.style.background = style.background;
+            } else {
+                viewport.style.background = '';
+            }
+            slide.style.background = 'transparent';
+        }
+
+        /* ---------- DOM scaffolding (auto-inserted if missing) ---------- */
+        _ensureNavDots() {
+            let el = document.getElementById('navDots');
+            if (!el) {
+                el = document.createElement('nav');
+                el.id = 'navDots';
+                el.className = 'nav-dots';
+                el.setAttribute('aria-label', 'Slide navigation');
+                document.body.appendChild(el);
+            }
+            return el;
+        }
+
+        _ensureKeyboardHint() {
+            let el = document.querySelector('.keyboard-hint');
+            if (!el) {
+                const i18n = {
+                    en: { navigate: 'navigate', restart: 'restart', fullscreen: 'fullscreen' },
+                    es: { navigate: 'navegar',   restart: 'inicio',   fullscreen: 'fullscreen' },
+                    fr: { navigate: 'naviguer',  restart: 'début',    fullscreen: 'fullscreen' },
+                    de: { navigate: 'blättern',  restart: 'anfang',   fullscreen: 'vollbild' },
+                    pt: { navigate: 'navegar',   restart: 'início',   fullscreen: 'fullscreen' },
+                    ja: { navigate: '移動',      restart: '先頭',      fullscreen: '全画面' },
+                    ko: { navigate: '이동',      restart: '처음',      fullscreen: '전체화면' },
+                    zh: { navigate: '翻页',      restart: '重置',      fullscreen: '全屏' },
+                    it: { navigate: 'navigare',  restart: 'inizio',   fullscreen: 'fullscreen' },
+                    nl: { navigate: 'bladeren',  restart: 'begin',    fullscreen: 'vollscherm' },
+                };
+                const t = i18n[_detectLang()] || i18n.en;
+                el = document.createElement('div');
+                el.className = 'keyboard-hint';
+                el.innerHTML = `<kbd>←</kbd> <kbd>→</kbd> ${t.navigate} &middot; <kbd>R</kbd> ${t.restart} &middot; <kbd>F</kbd> ${t.fullscreen}`;
+                document.body.appendChild(el);
+            }
+            return el;
+        }
+
+        _ensureCredit() {
+            let el = document.querySelector('.chassis-credit');
+            if (!el) {
+                el = document.createElement('div');
+                el.className = 'chassis-credit';
+                el.setAttribute('aria-hidden', 'true');
+                el.innerHTML = '💜 by ClickUp Brain';
+                document.body.appendChild(el);
+            }
+            return el;
+        }
+
+        /* ---------- Reveal engine ----------
+           Reveals are driven by the Web Animations API instead of CSS
+           transitions. This lets authors put .reveal* / .step on any
+           element: animation values live in the animation cascade origin
+           and win over normal author declarations, so no wrapper element
+           is required to isolate the chassis from author CSS.
+
+           State per slide:
+           - "hidden":  inline opacity/transform/filter from the 'from'
+                        keyframe of the variant. Set on init and on
+                        forward re-entry.
+           - "played":  animation is running or has run; the class
+                        `reveals-played` on the slide makes playback
+                        idempotent so observer re-fires (resize,
+                        fullscreen) don't restart the animation.
+           - "settled": animation canceled, inline styles cleared. Used
+                        for backward entries (we skip the animation and
+                        show the final state instantly) and for print. */
+
+        _setupReveals() {
+            // Lift the CSS FOUC guard first so getComputedStyle reads each
+            // element's natural opacity, not the guard's blanket opacity: 0.
+            // No paint occurs mid-task — inline hidden styles are applied
+            // before the browser yields, so there is no visible flash.
+            document.documentElement.classList.add('reveals-ready');
+            this.slides.forEach((slide) => {
+                slide.querySelectorAll(ALL_REVEAL_SELECTOR).forEach((el) => {
+                    el._targetOpacity = parseFloat(getComputedStyle(el).opacity);
+                    this._applyHiddenStyle(el);
+                });
+            });
+        }
+
+        _setupPrintSettling() {
+            // Browsers snapshot the document for print/PDF export. WAAPI
+            // animations don't necessarily complete in that snapshot, so
+            // settle every slide to its final state first. After printing,
+            // reset — but only for slides that haven't already been viewed,
+            // so the audience experience picks up where it left off.
+            window.addEventListener('beforeprint', () => {
+                this.slides.forEach((slide) => this._settleSlide(slide));
+            });
+        }
+
+        _readTokens() {
+            const cs = getComputedStyle(document.documentElement);
+            const rawDuration = parseFloat(cs.getPropertyValue('--reveal-duration'));
+            const duration = Number.isFinite(rawDuration) ? rawDuration * 1000 : 800;
+            const ease = cs.getPropertyValue('--reveal-ease').trim() || 'cubic-bezier(0.16, 1, 0.3, 1)';
+            const distance = cs.getPropertyValue('--reveal-distance').trim() || '28px';
+            const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+            return {
+                duration: reducedMotion ? 1 : duration,
+                ease,
+                distance,
+            };
+        }
+
+        _getRevealDelay(el) {
+            // Use getAttribute('class') rather than el.className: on SVG
+            // elements, `.className` is an SVGAnimatedString (not a string)
+            // and calling .match on it throws. getAttribute is uniform
+            // across HTML and SVG.
+            const classes = el.getAttribute('class') || '';
+            const m = classes.match(/\bd([1-8])\b/);
+            if (!m) return 0;
+            // Matches CSS .dN: d1 = 100ms, d2 = 250ms, +150ms per step.
+            return 100 + (parseInt(m[1], 10) - 1) * 150;
+        }
+
+        _getRevealKeyframes(el, distance) {
+            const to = el._targetOpacity ?? 1;
+            if (el.classList.contains('reveal-left')) {
+                return [
+                    { opacity: 0, transform: `translateX(calc(-1 * ${distance}))` },
+                    { opacity: to, transform: 'translateX(0)' },
+                ];
+            }
+            if (el.classList.contains('reveal-right')) {
+                return [
+                    { opacity: 0, transform: `translateX(${distance})` },
+                    { opacity: to, transform: 'translateX(0)' },
+                ];
+            }
+            if (el.classList.contains('reveal-scale')) {
+                return [
+                    { opacity: 0, transform: 'scale(0.88)' },
+                    { opacity: to, transform: 'scale(1)' },
+                ];
+            }
+            if (el.classList.contains('reveal-blur')) {
+                return [
+                    { opacity: 0, filter: 'blur(10px)' },
+                    { opacity: to, filter: 'blur(0)' },
+                ];
+            }
+            // Default: .reveal or .step (slide up + fade)
+            return [
+                { opacity: 0, transform: `translateY(${distance})` },
+                { opacity: to, transform: 'translateY(0)' },
+            ];
+        }
+
+        _applyHiddenStyle(el) {
+            const { distance } = this._readTokens();
+            const from = this._getRevealKeyframes(el, distance)[0];
+            if ('opacity' in from) el.style.opacity = from.opacity;
+            if ('transform' in from) el.style.transform = from.transform;
+            if ('filter' in from) el.style.filter = from.filter;
+        }
+
+        _clearHiddenStyle(el) {
+            el.style.opacity = '';
+            el.style.transform = '';
+            el.style.filter = '';
+        }
+
+        _cancelReveal(el) {
+            if (el._revealAnim) {
+                el._revealAnim.cancel();
+                el._revealAnim = null;
+            }
+        }
+
+        _playReveal(el, delayOverride) {
+            this._cancelReveal(el);
+            const { duration, ease, distance } = this._readTokens();
+            const delay = typeof delayOverride === 'number' ? delayOverride : this._getRevealDelay(el);
+            const keyframes = this._getRevealKeyframes(el, distance);
+            // fill: 'backwards' applies the 'from' keyframe during the
+            // stagger delay so the element stays hidden until its turn,
+            // without pinning the 'to' keyframe after the animation ends.
+            // This lets co-existing author CSS (e.g. a `.pulse` CSS
+            // animation on the same element) take over naturally once the
+            // entrance completes — otherwise our fill would mask anything
+            // the author wanted to happen post-reveal.
+            const anim = el.animate(keyframes, {
+                duration,
+                delay,
+                easing: ease,
+                fill: 'backwards',
+            });
+            el._revealAnim = anim;
+            // Safe to clear inline 'from' styles now — the animation's
+            // backwards-fill holds the element at the 'from' keyframe for
+            // the duration of any stagger delay.
+            this._clearHiddenStyle(el);
+        }
+
+        _playSlideReveals(slide) {
+            if (slide.classList.contains('reveals-played')) return;
+            slide.classList.add('reveals-played');
+            slide.querySelectorAll(REVEAL_SELECTOR).forEach((el) => this._playReveal(el));
+            // .step elements stay hidden until the user advances.
+        }
+
+        _resetSlideReveals(slide) {
+            // Forward re-entry: cancel in-flight animations, re-hide
+            // everything, and reset step state so the slide replays cleanly
+            // when the observer next adds .visible.
+            slide.classList.remove('reveals-played');
+            slide.querySelectorAll(ALL_REVEAL_SELECTOR).forEach((el) => {
+                this._cancelReveal(el);
+                this._applyHiddenStyle(el);
+            });
+            slide.querySelectorAll('.step.step-shown').forEach((el) => el.classList.remove('step-shown'));
+        }
+
+        _settleSlide(slide) {
+            // Print / PDF export: jump to the final state with everything
+            // shown, so every step appears in the exported document.
+            slide.classList.add('reveals-played');
+            slide.querySelectorAll(ALL_REVEAL_SELECTOR).forEach((el) => {
+                this._cancelReveal(el);
+                this._clearHiddenStyle(el);
+            });
+            slide.querySelectorAll('.step').forEach((el) => el.classList.add('step-shown'));
+        }
+
+        _rewindSlide(slide) {
+            // Backward re-entry: show reveals instantly (no replay — the
+            // viewer already saw the intro) but hide every step, so the
+            // slide is positioned at the start of its stepped content and
+            // can be stepped through again.
+            slide.classList.add('reveals-played');
+            slide.querySelectorAll(REVEAL_SELECTOR).forEach((el) => {
+                this._cancelReveal(el);
+                this._clearHiddenStyle(el);
+            });
+            slide.querySelectorAll('.step').forEach((el) => {
+                el.classList.remove('step-shown');
+                this._cancelReveal(el);
+                this._applyHiddenStyle(el);
+            });
+        }
+
+        /* ---------- Navigation ----------
+           goTo scrolls to the target. Both forward-replay and backward-
+           rewind need to mutate the target BEFORE scrolling — while it's
+           still offscreen — so the viewer never sees the old state flash
+           into view. Resetting after the slide is in view causes a visible
+           "show then hide" blink; the IntersectionObserver fires too late
+           (80% threshold) to catch it. */
+        goTo(index) {
+            const clamped = Math.max(0, Math.min(this.slides.length - 1, index));
+            if (clamped === this.currentSlide) return;
+
+            const target = this.slides[clamped];
+            const goingForward = clamped > this.currentSlide;
+
+            if (target.classList.contains('visible')) {
+                if (goingForward) {
+                    // Forward replay: full reset so the observer can play reveals fresh.
+                    target.classList.remove('visible');
+                    this._resetSlideReveals(target);
+                } else {
+                    // Backward rewind: hide any shown steps so the slide
+                    // scrolls back in at the start of its stepped content.
+                    this._rewindSlide(target);
+                }
+            }
+
+            this._scrollToSlide(clamped, 'smooth');
+        }
+
+        _scrollToSlide(index, behavior) {
+            this.viewports[index]?.scrollIntoView({ behavior, block: 'start' });
+        }
+
+        _slideIndexFromHash(hash) {
+            if (!hash) return -1;
+            return this.slides.findIndex((s) => '#' + s.id === hash);
+        }
+
+        _syncHash() {
+            const slide = this.slides[this.currentSlide];
+            if (!slide || !slide.id) return;
+            const newHash = '#' + slide.id;
+            if (location.hash !== newHash) {
+                // replaceState — keeps the URL in sync without polluting history,
+                // so the browser back button exits the deck instead of stepping through slides.
+                try {
+                    history.replaceState(null, '', newHash);
+                } catch {
+                    // Sandboxed iframes (opaque origin, about:srcdoc) reject URL
+                    // mutation with a SecurityError. Hash sync is a nicety — an
+                    // unguarded throw here kills the observer callback before it
+                    // marks the slide visible and plays its reveals.
+                }
+            }
+        }
+
+        _setupHashNav() {
+            // React to external hash changes (anchor link clicks, back/forward if user uses pushState manually)
+            window.addEventListener('hashchange', () => {
+                const idx = this._slideIndexFromHash(location.hash);
+                if (idx >= 0 && idx !== this.currentSlide) this.goTo(idx);
+            });
+        }
+
+        /* ---------- Custom cursor ----------
+           Accent disc that follows the pointer, hidden after idle. */
+        _setupCursor() {
+            if (!matchMedia('(hover: hover)').matches) return;
+
+            const cursor = document.createElement('div');
+            cursor.className = 'chassis-cursor';
+            cursor.setAttribute('aria-hidden', 'true');
+            document.body.appendChild(cursor);
+            document.body.classList.add('chassis-cursor-active');
+
+            const half = 16;  // matches width/height / 2 in CSS
+            const IDLE_MS = 2500;
+            let idleTimer = null;
+
+            const show = () => {
+                cursor.classList.add('visible');
+                clearTimeout(idleTimer);
+                idleTimer = setTimeout(() => {
+                    cursor.classList.remove('visible');
+                }, IDLE_MS);
+            };
+            const hide = () => {
+                clearTimeout(idleTimer);
+                cursor.classList.remove('visible');
+            };
+
+            document.addEventListener('mousemove', (e) => {
+                cursor.style.transform = `translate3d(${e.clientX - half}px, ${e.clientY - half}px, 0)`;
+                show();
+            });
+            document.addEventListener('mouseleave', hide);
+            document.addEventListener('mouseenter', show);
+        }
+
+        /* ---------- Fullscreen ---------- */
+        toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen?.().catch(() => {});
+            } else {
+                document.exitFullscreen?.();
+            }
+        }
+
+        next() { this.goTo(this.currentSlide + 1); }
+        prev() { this.goTo(this.currentSlide - 1); }
+        first() { this.goTo(0); }
+        last() { this.goTo(this.slides.length - 1); }
+
+        /* ---------- Step-aware advance / retreat ----------
+           advance() reveals the next .step on the current slide (if any),
+           otherwise advances to the next slide. retreat() hides the last
+           revealed step, otherwise goes back to the previous slide. */
+        advance() {
+            const current = this.slides[this.currentSlide];
+            const nextStep = current?.querySelector('.step:not(.step-shown)');
+            if (nextStep) {
+                nextStep.classList.add('step-shown');
+                // No stagger on click-reveal — the user's gesture is the trigger.
+                this._playReveal(nextStep, 0);
+                return;
+            }
+            this.next();
+        }
+        retreat() {
+            const current = this.slides[this.currentSlide];
+            const shown = current?.querySelectorAll('.step.step-shown');
+            if (shown && shown.length > 0) {
+                const last = shown[shown.length - 1];
+                last.classList.remove('step-shown');
+                this._cancelReveal(last);
+                this._applyHiddenStyle(last);
+                return;
+            }
+            this.prev();
+        }
+
+        /* ---------- Intersection observer ----------
+           Fire late (>= 80% in view) so reveals play on a settled slide.
+           This is the single source of truth for active-slide state.
+
+           Forward:  add .visible, play reveals. (goTo() has already reset
+                     the target to pre-reveal state if this is a re-visit,
+                     so the animation is fresh either way.)
+           Backward: add .visible, rewind to the start of the stepped
+                     content — reveals are shown instantly (no replay) and
+                     every step is hidden again so the viewer can step
+                     through it fresh. */
+        _setupIntersectionObserver() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (!entry.isIntersecting) return;
+                    const idx = this.viewports.indexOf(entry.target);
+                    if (idx < 0) return;
+                    const slide = this.slides[idx];
+
+                    if (idx === this.currentSlide) {
+                        // Same-slide re-fire (initial load, resize, fullscreen).
+                        if (!slide.classList.contains('visible')) {
+                            slide.classList.add('visible');
+                        }
+                        // Idempotent: only plays if not already marked played.
+                        this._playSlideReveals(slide);
+                        return;
+                    }
+
+                    const goingForward = idx > this.currentSlide;
+                    this.currentSlide = idx;
+                    this._updateNavDots();
+                    this._syncHash();
+
+                    slide.classList.add('visible');
+                    if (goingForward) {
+                        this._playSlideReveals(slide);
+                    } else {
+                        this._rewindSlide(slide);
+                    }
+                });
+            }, { threshold: 0.8 });
+
+            this.viewports.forEach((viewport) => observer.observe(viewport));
+        }
+
+        /* ---------- Keyboard ---------- */
+        _setupKeyboardNav() {
+            document.addEventListener('keydown', (e) => {
+                // Skip when user is editing text
+                if (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+
+                switch (e.key) {
+                    // Step-aware: consume steps first, then advance slides
+                    case 'ArrowDown':
+                    case 'ArrowRight':
+                    case ' ':
+                        e.preventDefault(); this.advance(); break;
+                    case 'ArrowUp':
+                    case 'ArrowLeft':
+                        e.preventDefault(); this.retreat(); break;
+                    // Slide-level: always skip past steps
+                    case 'PageDown':
+                        e.preventDefault(); this.next(); break;
+                    case 'PageUp':
+                        e.preventDefault(); this.prev(); break;
+                    case 'Home':
+                        e.preventDefault(); this.first(); break;
+                    case 'End':
+                        e.preventDefault(); this.last(); break;
+                    case 'f':
+                    case 'F':
+                        e.preventDefault(); this.toggleFullscreen(); break;
+                    case 'r':
+                    case 'R':
+                        e.preventDefault(); this.first(); break;
+                }
+            });
+        }
+
+        /* ---------- Wheel / trackpad ----------
+           ALWAYS preventDefault — letting any native wheel scroll through
+           races against scrollIntoView + mandatory snap, and blocks macOS
+           two-finger horizontal swipes from triggering browser back/forward.
+           Whichever axis has the larger magnitude wins, so vertical scroll
+           and horizontal trackpad swipes both drive advance/retreat. Lock
+           briefly after a gesture so trackpad inertia (continuous small
+           deltas) can't spam next(). */
+        _setupWheelNav() {
+            let locked = false;
+            window.addEventListener('wheel', (e) => {
+                if (e.ctrlKey) return;                // preserve browser pinch-zoom (ctrl+wheel)
+                e.preventDefault();                   // block native scroll + horizontal back-swipe
+                if (locked) return;
+                const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+                if (Math.abs(delta) < 20) return;     // ignore tiny flicks
+                locked = true;
+                if (delta > 0) this.advance(); else this.retreat();
+                setTimeout(() => { locked = false; }, 500);
+            }, { passive: false });
+        }
+
+        /* ---------- Touch / swipe ----------
+           Horizontal swipes advance / retreat slides; left = next, right =
+           prev (matches stories / carousel conventions). Dominantly
+           vertical swipes fall through to native scroll-snap so the
+           existing top/bottom behavior keeps working. A time budget
+           rejects slow pans that were really aborted scrolls. */
+        _setupTouchNav() {
+            const MIN_DISTANCE = 50;     // px — below this is a tap or jitter
+            const MAX_TIME = 600;        // ms — slower than this is a pan, not a swipe
+            const DOMINANCE = 1.2;       // horizontal must beat vertical by this factor
+
+            let startX = 0, startY = 0, startTime = 0;
+            let tracking = false;
+
+            window.addEventListener('touchstart', (e) => {
+                if (document.body.classList.contains('artifact-editor-editing')) { tracking = false; return; }
+                if (e.touches.length !== 1) { tracking = false; return; }
+                const t = e.touches[0];
+                startX = t.clientX;
+                startY = t.clientY;
+                startTime = performance.now();
+                tracking = true;
+            }, { passive: true });
+
+            window.addEventListener('touchend', (e) => {
+                if (!tracking) return;
+                tracking = false;
+                const t = e.changedTouches[0];
+                const dx = t.clientX - startX;
+                const dy = t.clientY - startY;
+                const ax = Math.abs(dx), ay = Math.abs(dy);
+                if (ax < MIN_DISTANCE) return;
+                if (ax < ay * DOMINANCE) return;
+                if (performance.now() - startTime > MAX_TIME) return;
+                if (dx < 0) this.advance(); else this.retreat();
+            }, { passive: true });
+
+            window.addEventListener('touchcancel', () => { tracking = false; }, { passive: true });
+        }
+
+        /* ---------- Canvas scaling ----------
+           Each scaler holds a fixed 1920×1080 slide. Compute the
+           scale factor that fits it inside the viewport and apply via
+           CSS custom property. Runs on init, resize, and fullscreen. */
+        _setupCanvasScale() {
+            const CANVAS_W = 1920;
+            const CANVAS_H = 1080;
+            const scales = this.scales;
+
+            const update = () => {
+                const scale = Math.min(
+                    window.innerWidth / CANVAS_W,
+                    window.innerHeight / CANVAS_H
+                );
+                scales.forEach((el) => {
+                    el?.style.setProperty('--slide-scale', scale);
+                });
+            };
+
+            update();
+            window.addEventListener('resize', update);
+            document.addEventListener('fullscreenchange', () => {
+                requestAnimationFrame(update);
+            });
+        }
+
+        /* ---------- Viewport sync ----------
+           Resize / fullscreenchange → realign current slide. Each slide is
+           100vh, so a viewport height change leaves the existing scroll
+           position out of alignment with the slide top; scroll-snap doesn't
+           re-snap on its own. */
+        _setupViewportSync() {
+            const realign = () => {
+                requestAnimationFrame(() => {
+                    this._scrollToSlide(this.currentSlide, 'auto');
+                });
+            };
+            window.addEventListener('resize', realign);
+            document.addEventListener('fullscreenchange', realign);
+        }
+
+        /* ---------- Nav dots ---------- */
+        _buildNavDots() {
+            // Clear first — prevents duplicates when DOM is re-serialized/re-opened
+            this.navDotsContainer.innerHTML = '';
+            this.slides.forEach((slide, idx) => {
+                const dot = document.createElement('button');
+                dot.setAttribute('aria-label', `Go to slide ${idx + 1}`);
+                if (idx === 0) dot.classList.add('active');
+                dot.addEventListener('click', () => this.goTo(idx));
+                this.navDotsContainer.appendChild(dot);
+            });
+        }
+
+        _updateNavDots() {
+            const dots = this.navDotsContainer.querySelectorAll('button');
+            dots.forEach((dot, idx) => {
+                dot.classList.toggle('active', idx === this.currentSlide);
+            });
+        }
+    }
+
+    /* ---------- Auto-init ---------- */
+    function init() {
+        // Each slide canvas is its own editable host for the inline editor.
+        document.querySelectorAll('.slide').forEach(function (el) {
+            el.classList.add('artifact-editable');
+        });
+        window.slides = new SlidePresentation();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+
+</script>
+<!-- /skill:chassis -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Distribuirani IoT Sistem: CEP & MaaS</title>
+
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+
+    <style>
+        :root {
+            --background:        #0d0d0d;
+            --foreground:        #f5f5f5;
+            --accent:            #FF5722;
+            --accent-secondary:  #FF9800;
+            --accent-foreground: #0d0d0d;
+            --card:              #1a1a1a;
+            --card-foreground:   #f5f5f5;
+            --border:            rgba(255,255,255,0.08);
+            --font-display: 'Archivo Black', sans-serif;
+            --font-body: 'Space Grotesk', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --nav-dot-color: rgba(255,255,255,0.3);
+            --nav-dot-active-color: var(--accent);
+        }
+
+        body {
+            background: var(--background);
+            color: var(--foreground);
+        }
+
+        h1, h2, h3 {
+            font-family: var(--font-display);
+            font-weight: 900;
+            letter-spacing: -0.02em;
+        }
+        p, li, span {
+            font-family: var(--font-body);
+        }
+        code, pre {
+            font-family: var(--font-mono);
+        }
+
+        .slide {
+            background: var(--background);
+            padding: 80px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .section-number {
+            font-family: var(--font-display);
+            font-size: 160px;
+            color: var(--accent);
+            opacity: 0.12;
+            position: absolute;
+            top: 40px;
+            right: 80px;
+            line-height: 1;
+        }
+
+        .eyebrow {
+            font-family: var(--font-mono);
+            font-size: 20px;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-bottom: 20px;
+        }
+
+        .accent-card {
+            background: var(--accent);
+            color: var(--accent-foreground);
+            border-radius: 12px;
+            padding: 40px 48px;
+        }
+
+        .code-block {
+            background: #111111;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 36px 40px;
+            font-family: var(--font-mono);
+            font-size: 24px;
+            line-height: 1.7;
+            color: #e0e0e0;
+            max-width: 1100px;
+        }
+        .code-block .keyword { color: #FF5722; }
+        .code-block .string { color: #FF9800; }
+        .code-block .comment { color: #666; font-style: italic; }
+        .code-block .func { color: #4FC3F7; }
+        .code-block .var { color: #CE93D8; }
+
+        /* Background grid */
+        .grid-bg::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255,87,34,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,87,34,0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+        }
+
+        /* ===== SLIDE 1: HERO ===== */
+        .hero {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        .hero h1 {
+            font-size: 88px;
+            line-height: 1.05;
+            max-width: 1400px;
+        }
+        .hero h1 .highlight {
+            color: var(--accent);
+        }
+        .hero .subtitle {
+            font-size: 32px;
+            color: rgba(255,255,255,0.5);
+            margin-top: 40px;
+        }
+        .hero .meta {
+            font-family: var(--font-mono);
+            font-size: 20px;
+            color: rgba(255,255,255,0.35);
+            margin-top: 24px;
+        }
+        .hero::after {
+            content: '';
+            position: absolute;
+            top: -200px;
+            right: -200px;
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(255,87,34,0.15), transparent 60%);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: pulse-glow 5s ease-in-out infinite;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.6; transform: scale(0.9); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+
+        /* ===== SLIDE 2: ARCHITECTURE ===== */
+        .arch-slide {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding-top: 60px;
+        }
+        .arch-slide h2 {
+            font-size: 52px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .arch-diagram {
+            position: relative;
+            width: 1600px;
+            height: 700px;
+            margin-top: 20px;
+        }
+        .arch-node {
+            position: absolute;
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-family: var(--font-body);
+            font-weight: 600;
+            font-size: 22px;
+            transition: transform 0.3s;
+        }
+        .arch-node .node-icon {
+            font-size: 36px;
+            margin-bottom: 8px;
+        }
+        .arch-node .node-tech {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            opacity: 0.6;
+            margin-top: 4px;
+        }
+
+        .node-iot {
+            top: 260px; left: 0;
+            width: 200px; height: 160px;
+            background: linear-gradient(135deg, #1a2a1a, #1a3a1a);
+            border: 2px solid #4CAF50;
+            color: #81C784;
+        }
+        .node-mqtt {
+            top: 120px; left: 300px;
+            width: 200px; height: 140px;
+            background: linear-gradient(135deg, #1a1a2a, #1a1a3a);
+            border: 2px solid #5C6BC0;
+            color: #9FA8DA;
+        }
+        .node-kafka {
+            top: 400px; left: 300px;
+            width: 200px; height: 140px;
+            background: linear-gradient(135deg, #2a1a1a, #3a1a1a);
+            border: 2px solid #E57373;
+            color: #EF9A9A;
+        }
+        .node-ingestion {
+            top: 260px; left: 600px;
+            width: 220px; height: 160px;
+            background: linear-gradient(135deg, #2a2a1a, #3a3a1a);
+            border: 2px solid #FFB74D;
+            color: #FFE0B2;
+        }
+        .node-cep {
+            top: 80px; left: 940px;
+            width: 240px; height: 160px;
+            background: linear-gradient(135deg, #1a2a2a, #1a3a3a);
+            border: 2px solid #4DD0E1;
+            color: #B2EBF2;
+        }
+        .node-maas {
+            top: 420px; left: 940px;
+            width: 240px; height: 160px;
+            background: linear-gradient(135deg, #2a1a2a, #3a1a3a);
+            border: 2px solid #CE93D8;
+            color: #E1BEE7;
+        }
+        .node-analytics {
+            top: 260px; left: 1320px;
+            width: 240px; height: 160px;
+            background: linear-gradient(135deg, #2a1a0a, #3a2a0a);
+            border: 2px solid var(--accent);
+            color: #FFCCBC;
+        }
+
+        /* Animated connection lines via SVG */
+        .arch-svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .arch-svg path {
+            fill: none;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+        }
+        .flow-line {
+            stroke-dasharray: 12 8;
+            animation: flow 2s linear infinite;
+        }
+        @keyframes flow {
+            to { stroke-dashoffset: -40; }
+        }
+
+        /* ===== SLIDE 3-6: CODE SLIDES ===== */
+        .code-slide {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .code-slide h2 {
+            font-size: 56px;
+            margin-bottom: 12px;
+        }
+        .code-slide .key-msg {
+            font-size: 28px;
+            color: rgba(255,255,255,0.55);
+            margin-bottom: 40px;
+            max-width: 900px;
+        }
+
+        /* ===== SLIDE 7: SCENARIOS ===== */
+        .scenarios-slide {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .scenarios-slide h2 {
+            font-size: 56px;
+            margin-bottom: 40px;
+        }
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 28px;
+            max-width: 1400px;
+        }
+        .scenario-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 32px 36px;
+            border-left: 4px solid var(--accent);
+        }
+        .scenario-card h3 {
+            font-family: var(--font-body);
+            font-weight: 700;
+            font-size: 26px;
+            margin-bottom: 10px;
+            color: var(--accent);
+        }
+        .scenario-card p {
+            font-size: 22px;
+            color: rgba(255,255,255,0.6);
+            line-height: 1.5;
+        }
+
+        /* ===== SLIDE 8: CLOSER ===== */
+        .closer {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        .closer h1 {
+            font-size: 80px;
+            line-height: 1.1;
+            max-width: 1200px;
+        }
+        .closer h1 .highlight {
+            color: var(--accent);
+        }
+        .closer .summary {
+            font-size: 28px;
+            color: rgba(255,255,255,0.5);
+            margin-top: 40px;
+            max-width: 800px;
+            line-height: 1.5;
+        }
+        .closer::before {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 900px; height: 900px;
+            transform: translate(-50%, -50%);
+            background: radial-gradient(circle, rgba(255,87,34,0.12), transparent 60%);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: pulse-glow 6s ease-in-out infinite;
+        }
+
+        /* Tech stack pills */
+        .tech-pills {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 24px;
+        }
+        .tech-pill {
+            font-family: var(--font-mono);
+            font-size: 16px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: rgba(255,87,34,0.12);
+            border: 1px solid rgba(255,87,34,0.3);
+            color: var(--accent);
+        }
+
+        /* Teza list */
+        .teza-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 20px;
+        }
+        .teza-list li {
+            font-size: 26px;
+            color: rgba(255,255,255,0.7);
+            padding: 12px 0;
+            padding-left: 40px;
+            position: relative;
+            line-height: 1.4;
+        }
+        .teza-list li::before {
+            content: attr(data-num);
+            position: absolute;
+            left: 0;
+            font-family: var(--font-display);
+            color: var(--accent);
+            font-size: 22px;
+        }
+    </style>
+</head>
+<body data-nav="bottom">
+
+    <!-- Ambient particles canvas -->
+    <canvas id="particles" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;"></canvas>
+
+    <!-- SLIDE 1: HERO -->
+    <section class="slide hero grid-bg">
+        <span class="section-number reveal d1">01</span>
+        <span class="eyebrow reveal d1">Projekat III &bull; Internet of Things</span>
+        <h1 class="reveal d2">Distribuirani IoT Sistem:<br><span class="highlight">CEP Obrada Strimova</span><br>& MaaS Analitika</h1>
+        <p class="subtitle reveal d3">Hibridna analiza podataka u realnom vremenu</p>
+        <p class="meta reveal d4">Vukašin Filipović &bull; Br. indeksa: 18972 &bull; Jul 2026</p>
+    </section>
+
+    <!-- SLIDE 2: ARCHITECTURE (ANIMATED DIAGRAM) -->
+    <section class="slide arch-slide grid-bg">
+        <span class="section-number reveal d1">02</span>
+        <h2 class="reveal d1">Arhitektura Sistema</h2>
+        <div class="eyebrow reveal d2" style="margin-bottom:10px;">Cilj: Hibridni pristup analizi podataka u realnom vremenu</div>
+
+        <div class="arch-diagram reveal-scale d3">
+            <!-- SVG Connections -->
+            <svg class="arch-svg" viewBox="0 0 1600 700">
+                <!-- IoT → MQTT -->
+                <path class="flow-line" d="M200 320 C250 320, 260 190, 300 190" stroke="#4CAF50" />
+                <!-- IoT → Kafka -->
+                <path class="flow-line" d="M200 360 C250 360, 260 470, 300 470" stroke="#4CAF50" style="animation-delay: 0.5s;" />
+                <!-- MQTT → Ingestion -->
+                <path class="flow-line" d="M500 190 C550 190, 560 340, 600 340" stroke="#5C6BC0" style="animation-delay: 0.3s;" />
+                <!-- Kafka → Ingestion -->
+                <path class="flow-line" d="M500 470 C550 470, 560 340, 600 340" stroke="#E57373" style="animation-delay: 0.7s;" />
+                <!-- Ingestion → CEP -->
+                <path class="flow-line" d="M820 290 C880 290, 900 160, 940 160" stroke="#FFB74D" style="animation-delay: 0.4s;" />
+                <!-- Ingestion → MaaS -->
+                <path class="flow-line" d="M820 380 C880 380, 900 500, 940 500" stroke="#FFB74D" style="animation-delay: 0.9s;" />
+                <!-- CEP → Analytics -->
+                <path class="flow-line" d="M1180 160 C1240 160, 1280 310, 1320 320" stroke="#4DD0E1" style="animation-delay: 0.6s;" />
+                <!-- MaaS → Analytics -->
+                <path class="flow-line" d="M1180 500 C1240 500, 1280 370, 1320 360" stroke="#CE93D8" style="animation-delay: 1.1s;" />
+
+                <!-- Animated data pulses -->
+                <circle r="5" fill="#4CAF50" opacity="0.9">
+                    <animateMotion dur="2.5s" repeatCount="indefinite" path="M200 320 C250 320, 260 190, 300 190" />
+                </circle>
+                <circle r="5" fill="#5C6BC0" opacity="0.9">
+                    <animateMotion dur="2.5s" repeatCount="indefinite" path="M500 190 C550 190, 560 340, 600 340" begin="0.4s" />
+                </circle>
+                <circle r="5" fill="#FFB74D" opacity="0.9">
+                    <animateMotion dur="2.5s" repeatCount="indefinite" path="M820 290 C880 290, 900 160, 940 160" begin="0.8s" />
+                </circle>
+                <circle r="5" fill="#CE93D8" opacity="0.9">
+                    <animateMotion dur="2.5s" repeatCount="indefinite" path="M1180 500 C1240 500, 1280 370, 1320 360" begin="1.2s" />
+                </circle>
+                <circle r="4" fill="#FF5722" opacity="0.9">
+                    <animateMotion dur="2.5s" repeatCount="indefinite" path="M820 380 C880 380, 900 500, 940 500" begin="0.6s" />
+                </circle>
+                <circle r="4" fill="#4DD0E1" opacity="0.9">
+                    <animateMotion dur="2.5s" repeatCount="indefinite" path="M1180 160 C1240 160, 1280 310, 1320 320" begin="1s" />
+                </circle>
+            </svg>
+
+            <!-- Nodes -->
+            <div class="arch-node node-iot">
+                <span class="node-icon">📡</span>
+                IoT Senzori
+                <span class="node-tech">5000 uređaja</span>
+            </div>
+            <div class="arch-node node-mqtt">
+                <span class="node-icon">📨</span>
+                MQTT Broker
+                <span class="node-tech">EMQX / Mosquitto</span>
+            </div>
+            <div class="arch-node node-kafka">
+                <span class="node-icon">🔄</span>
+                Apache Kafka
+                <span class="node-tech">Stream Buffer</span>
+            </div>
+            <div class="arch-node node-ingestion">
+                <span class="node-icon">⚡</span>
+                Ingestion Servis
+                <span class="node-tech">Node.js</span>
+            </div>
+            <div class="arch-node node-cep">
+                <span class="node-icon">🧠</span>
+                CEP Engine
+                <span class="node-tech">eKuiper SQL Rules</span>
+            </div>
+            <div class="arch-node node-maas">
+                <span class="node-icon">🤖</span>
+                MaaS ML Model
+                <span class="node-tech">FastAPI + Scikit-Learn</span>
+            </div>
+            <div class="arch-node node-analytics">
+                <span class="node-icon">📊</span>
+                Analytics Servis
+                <span class="node-tech">Python / Centralni Hub</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 3: MaaS ML Pipeline -->
+    <section class="slide code-slide grid-bg">
+        <span class="section-number reveal d1">03</span>
+        <span class="eyebrow reveal d1">MaaS Pipeline</span>
+        <h2 class="reveal d2">ML Trening Pipeline</h2>
+        <p class="key-msg reveal d3">Model razvijen po standardima: Trening → Validacija → Testiranje</p>
+        <div class="code-block reveal d4">
+            <span class="comment"># Podela podataka na trening i validaciju/test</span><br>
+            <span class="var">X_train</span>, <span class="var">X_test</span>, <span class="var">y_train</span>, <span class="var">y_test</span> = <span class="func">train_test_split</span>(X, y, <span class="var">test_size</span>=<span class="string">0.2</span>)<br><br>
+            <span class="comment"># Trening Logističke Regresije</span><br>
+            <span class="var">model</span> = <span class="func">LogisticRegression</span>()<br>
+            <span class="var">model</span>.<span class="func">fit</span>(<span class="var">X_train</span>, <span class="var">y_train</span>)<br><br>
+            <span class="comment"># Evaluacija tačnosti pre podizanja servisa</span><br>
+            <span class="var">accuracy</span> = <span class="func">accuracy_score</span>(<span class="var">y_test</span>, <span class="var">y_pred</span>)
+        </div>
+    </section>
+
+    <!-- SLIDE 4: MaaS REST API -->
+    <section class="slide code-slide grid-bg">
+        <span class="section-number reveal d1">04</span>
+        <span class="eyebrow reveal d1">MaaS Endpoint</span>
+        <h2 class="reveal d2">REST API za Predikciju</h2>
+        <p class="key-msg reveal d3">Model izložen kao mikroservis preko FastAPI unutar Docker-a</p>
+        <div class="code-block reveal d4">
+            <span class="keyword">@app.post</span>(<span class="string">"/predict"</span>)<br>
+            <span class="keyword">def</span> <span class="func">predict_anomaly</span>(data: <span class="var">SensorData</span>):<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span class="var">prediction</span> = model.<span class="func">predict</span>([[data.temperature]])[<span class="string">0</span>]<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span class="var">probability</span> = model.<span class="func">predict_proba</span>([[data.temperature]])[<span class="string">0</span>][prediction]<br><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> {<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"status"</span>: <span class="string">"CRITICAL_ANOMALY"</span> <span class="keyword">if</span> prediction == <span class="string">1</span> <span class="keyword">else</span> <span class="string">"NORMAL"</span>,<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"probability"</span>: probability<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;}
+        </div>
+    </section>
+
+    <!-- SLIDE 5: eKuiper CEP -->
+    <section class="slide code-slide grid-bg">
+        <span class="section-number reveal d1">05</span>
+        <span class="eyebrow reveal d1">CEP Engine</span>
+        <h2 class="reveal d2">eKuiper Stream Processing</h2>
+        <p class="key-msg reveal d3">Deklarativna SQL pravila nad MQTT tokovima: temperatura > 50°C → alarm</p>
+        <div class="code-block reveal d4">
+            <span class="keyword">CREATE STREAM</span> <span class="var">iot_stream</span> () <span class="keyword">WITH</span> (<br>
+            &nbsp;&nbsp;<span class="var">DATASOURCE</span>=<span class="string">"iot_sensor_data"</span>,<br>
+            &nbsp;&nbsp;<span class="var">FORMAT</span>=<span class="string">"json"</span>, <span class="var">TYPE</span>=<span class="string">"mqtt"</span><br>
+            )<br><br>
+            <span class="keyword">SELECT</span> <span class="var">temperature</span>,<br>
+            &nbsp;&nbsp;<span class="string">"ALARM: Visoka temperatura!"</span> <span class="keyword">as</span> <span class="var">poruka</span><br>
+            <span class="keyword">FROM</span> <span class="var">iot_stream</span><br>
+            <span class="keyword">WHERE</span> <span class="var">temperature</span> > <span class="string">50</span>
+        </div>
+        <div class="tech-pills reveal d5">
+            <span class="tech-pill">MQTT Topic: sensors/ekuiper_alarms</span>
+            <span class="tech-pill">Real-time</span>
+            <span class="tech-pill">Edge Processing</span>
+        </div>
+    </section>
+
+    <!-- SLIDE 6: Analytics Integration -->
+    <section class="slide code-slide grid-bg">
+        <span class="section-number reveal d1">06</span>
+        <span class="eyebrow reveal d1">Integracija</span>
+        <h2 class="reveal d2">Centralni Analytics Servis</h2>
+        <p class="key-msg reveal d3">Pretplaćen na oba izvora: CEP alarme i MaaS predikcije paralelno</p>
+        <div class="code-block reveal d4">
+            <span class="keyword">def</span> <span class="func">on_message</span>(client, userdata, msg):<br>
+            &nbsp;&nbsp;<span class="keyword">if</span> msg.topic == <span class="string">"sensors/ekuiper_alarms"</span>:<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;logger.<span class="func">warning</span>(<span class="string">f"🚨 [eKuiper CEP ALERT] {msg.payload.decode()}"</span>)<br><br>
+            &nbsp;&nbsp;<span class="keyword">if</span> msg.topic == <span class="string">"iot_sensor_data"</span>:<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span class="var">response</span> = requests.<span class="func">post</span>(<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"http://iot_maas_p3:8000/predict"</span>,<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;json={<span class="string">"temperature"</span>: temp}<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;)<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># Logovanje odgovora sa MaaS ML modela</span>
+        </div>
+    </section>
+
+    <!-- SLIDE 7: Verification / Scenarios -->
+    <section class="slide scenarios-slide grid-bg">
+        <span class="section-number reveal d1">07</span>
+        <span class="eyebrow reveal d1">Demonstracija</span>
+        <h2 class="reveal d2">Verifikacija Sistema</h2>
+        <div class="scenario-grid">
+            <div class="scenario-card reveal d3">
+                <h3>A: Benchmarking</h3>
+                <p>Kafka vs MQTT propusnost. kafka-producer-perf-test.sh + emqtt-bench (QoS 0/1/2)</p>
+            </div>
+            <div class="scenario-card reveal d4">
+                <h3>B: Fault Tolerance</h3>
+                <p>Simulacija mrežnih padova: docker network disconnect</p>
+            </div>
+            <div class="scenario-card reveal d5">
+                <h3>C: Skalabilnost</h3>
+                <p>Skaliranje resursa do 5000 virtuelnih IoT uređaja</p>
+            </div>
+            <div class="scenario-card reveal d6">
+                <h3>D: Toplotni Udar 🔥</h3>
+                <p>65.5°C → ML: CRITICAL_ANOMALY (100%) + eKuiper CEP alarm paralelno</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 8: CLOSER -->
+    <section class="slide closer grid-bg">
+        <span class="section-number reveal d1">08</span>
+        <h1 class="reveal-scale d2">Reaktivna. Skalabilna.<br><span class="highlight">Inteligentna.</span></h1>
+        <p class="summary reveal d3">Edge obrada strimova (eKuiper) + teška analitika (MaaS) = kompletna IoT arhitektura. Kod i Docker konfiguracija verifikovani i na GitHub-u.</p>
+        <div class="tech-pills reveal d4">
+            <span class="tech-pill">Node.js</span>
+            <span class="tech-pill">Python</span>
+            <span class="tech-pill">FastAPI</span>
+            <span class="tech-pill">EMQX</span>
+            <span class="tech-pill">Kafka</span>
+            <span class="tech-pill">eKuiper</span>
+            <span class="tech-pill">Docker</span>
+            <span class="tech-pill">Scikit-Learn</span>
+        </div>
+    </section>
+
+    <script>
+        // Ambient floating particles
+        const canvas = document.getElementById('particles');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        for (let i = 0; i < 60; i++) {
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                vx: (Math.random() - 0.5) * 0.3,
+                vy: (Math.random() - 0.5) * 0.3,
+                r: Math.random() * 2 + 0.5,
+                alpha: Math.random() * 0.15 + 0.05
+            });
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                if (p.x < 0) p.x = canvas.width;
+                if (p.x > canvas.width) p.x = 0;
+                if (p.y < 0) p.y = canvas.height;
+                if (p.y > canvas.height) p.y = 0;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 87, 34, ${p.alpha})`;
+                ctx.fill();
+            });
+
+            // Draw faint connections
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 120) {
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.strokeStyle = `rgba(255, 87, 34, ${0.04 * (1 - dist / 120)})`;
+                        ctx.stroke();
+                    }
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+        animate();
+    </script>
+</body>
+</html>
